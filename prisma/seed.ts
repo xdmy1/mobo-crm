@@ -134,7 +134,7 @@ async function main() {
   const pass = await bcrypt.hash("admin123", 10);
   const users: Array<[string, string, string, string]> = [
     ["admin", "Administrator", "general", "admin"],
-    ["stoian.iurii", "Stoian", "Iurii", "Manager Operațional"],
+    ["stoian.iurii", "Stoian", "Iurii", "Administrator"],
     ["manager.vanzari", "Manager", "Vânzări", "Manager Vânzări"],
     ["producere", "Producere", "Producere", "Manager Producere"],
     ["analiza", "Analiză", "Statistică", "Quality Control"],
