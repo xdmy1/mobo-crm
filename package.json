@@ -6,21 +6,52 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "dejavu-fonts-ttf": "^2.37.3",
+    "docx": "^9.7.1",
+    "iron-session": "^8.0.4",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.47.0",
     "next": "16.3.5",
+    "nodemailer": "^10.0.10",
+    "pdfkit": "^0.20.2",
+    "pptxgenjs": "^4.0.1",
+    "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "sharp": "^0.35.4",
+    "tailwind-merge": "^3.7.0",
+    "web-push": "^3.6.7",
+    "xlsx": "^0.18.5",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.20.3",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pdfkit": "^0.17.6",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.13",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

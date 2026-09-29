@@ -1,26 +1,619 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand Mobo kitchens & home: lime #CCDF10 (din logo) + grafit cald.
+     Lime-ul e ilizibil ca TEXT pe fundal deschis → accentul de text e oliva. */
+  --mobo-lime: #ccdf10;
+  --mobo-lime-hi: #d9ea3a;
+  --mobo-lime-dark: #9aa80c;
+  --mobo-ink: #181914;
+  --mobo-ink-soft: #24251e;
+
+  --background: #f3f3ef;
+  --foreground: #16170f;
+  --card: #ffffff;
+  --subtle: #efeee9;
+  --border: #d9d8d0;
+  --border-strong: #bfbeb4;
+  --muted: #55574e;
+
+  --primary: #5a6300;
+  --primary-hover: #454c00;
+  --primary-fg: #ffffff;
+
+  --invert: #191a16;
+  --invert-fg: #ffffff;
+  --invert-hover: #33352c;
+
+  --create: #ccdf10;
+  --create-fg: #191a02;
+  --create-hover: #d9ea3a;
+
+  --danger: #d4402f;
+  --danger-hover: #b33323;
+  --success: #2f8f4e;
+  --warn: #c98a06;
+  --info: #3b6fd4;
+
+  --sidebar: #181914;
+  --sidebar-fg: #a9ab9f;
+  --sidebar-fg-strong: #f4f4ef;
+  --sidebar-border: #2b2c25;
+  --sidebar-hover: #23241d;
+
+  --elev-xs: 0 1px 2px rgb(25 26 22 / 0.07);
+  --elev-sm: 0 1px 2px rgb(25 26 22 / 0.06), 0 2px 8px -2px rgb(25 26 22 / 0.09);
+  --elev-lg: 0 4px 10px -2px rgb(25 26 22 / 0.08), 0 18px 40px -8px rgb(25 26 22 / 0.22);
+
+  /* curbe de mișcare — definite și aici, ca să existe sigur în CSS-ul scris de mână */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-theme="dark"] {
+  --background: #111210;
+  --foreground: #ecece6;
+  --card: #191a17;
+  --subtle: #20211d;
+  --border: #2a2b26;
+  --border-strong: #3a3b34;
+  --muted: #9a9c90;
+
+  --primary: #ccdf10;
+  --primary-hover: #d9ea3a;
+  --primary-fg: #191a02;
+
+  --invert: #ecece6;
+  --invert-fg: #191a16;
+  --invert-hover: #ffffff;
+
+  --danger: #ef6a5a;
+  --danger-hover: #f58475;
+  --success: #5cc37d;
+  --warn: #e6b23c;
+  --info: #7aa2f0;
+
+  --sidebar: #0c0d0b;
+  --sidebar-border: #23241f;
+  --sidebar-hover: #1a1b17;
+
+  --elev-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --elev-lg: 0 4px 10px -2px rgb(0 0 0 / 0.5), 0 18px 40px -8px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-lime-brand: var(--mobo-lime);
+  --color-ink: var(--mobo-ink);
+  --color-ink-soft: var(--mobo-ink-soft);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-invert: var(--invert);
+  --color-invert-fg: var(--invert-fg);
+  --color-invert-hover: var(--invert-hover);
+  --color-create: var(--create);
+  --color-create-fg: var(--create-fg);
+  --color-create-hover: var(--create-hover);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-fg-strong: var(--sidebar-fg-strong);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --shadow-xs: var(--elev-xs);
+  --shadow-sm: var(--elev-sm);
+  --shadow-pop: var(--elev-lg);
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+::selection {
+  background: color-mix(in srgb, var(--mobo-lime) 50%, transparent);
+  color: var(--foreground);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+}
+
+.sidebar-scroll {
+  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
+}
+
+/* în layer-ul base, ca utilitarele (outline-none, ring-*) să-l poată suprascrie */
+@layer base {
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--mobo-lime-dark) 80%, transparent);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+  }
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+[data-theme="dark"] input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ───────────── Mișcare ─────────────
+   Reguli: intrările folosesc ease-out puternic, ieșirile sunt mai scurte decât
+   intrările, se animă doar transform + opacity, nimic peste 300ms. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes drawer-out {
+  to {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes col-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-drawer-in {
+  animation: drawer-in 0.3s var(--ease-drawer);
+}
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out;
+}
+.animate-pop-in {
+  animation: pop-in 0.18s var(--ease-out-strong);
+}
+/* meniuri/popovere: cresc din punctul de care sunt ancorate (origin-* pe element) */
+.animate-menu-in {
+  animation: menu-in 0.15s var(--ease-out-strong);
+}
+.animate-rise-in {
+  animation: rise-in 0.3s var(--ease-out-strong) both;
+}
+/* fără fill „forwards”: după animație nu rămâne niciun transform pe container,
+   deci elementele `position: fixed` din pagină (Mod TV) nu sunt afectate */
+.animate-page-in {
+  animation: page-in 0.22s var(--ease-out-strong) backwards;
+}
+.animate-check-in {
+  animation: check-in 0.14s var(--ease-out-strong);
+}
+.animate-bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 0.6s var(--ease-out-strong) backwards;
+}
+.animate-col-grow {
+  transform-origin: center bottom;
+  animation: col-grow 0.6s var(--ease-out-strong) backwards;
+}
+.animate-draw-line {
+  stroke-dasharray: 1;
+  animation: draw-line 0.9s var(--ease-in-out-strong) backwards;
+}
+.animate-ping-soft {
+  animation: ping-soft 1.8s var(--ease-out-strong) infinite;
+}
+
+/* Suprapuneri (drawer / modal): intrare + ieșire comandate de data-state */
+[data-state="open"] > .overlay-backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+[data-state="closed"] > .overlay-backdrop {
+  animation: fade-out 0.16s ease-out forwards;
+}
+[data-state="open"] > .overlay-drawer {
+  animation: drawer-in 0.3s var(--ease-drawer);
+}
+[data-state="closed"] > .overlay-drawer {
+  animation: drawer-out 0.18s var(--ease-out-strong) forwards;
+}
+[data-state="open"] > .overlay-sheet {
+  animation: sheet-in 0.3s var(--ease-drawer);
+}
+[data-state="closed"] > .overlay-sheet {
+  animation: sheet-out 0.2s var(--ease-out-strong) forwards;
+}
+[data-state="open"] > .overlay-modal {
+  animation: pop-in 0.2s var(--ease-out-strong);
+}
+[data-state="closed"] > .overlay-modal {
+  animation: pop-out 0.13s ease-out forwards;
+}
+/* acțiunile pornite din tastatură (⌘K) nu se animă deloc */
+[data-instant] > .overlay-backdrop,
+[data-instant] > .overlay-modal {
+  animation: none;
+}
+
+/* Toast-uri: tranziții (nu keyframes) ca să poată fi întrerupte și re-țintite */
+.toast {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.3s var(--ease-out-strong),
+    transform 0.3s var(--ease-out-strong);
+}
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translateY(100%) scale(0.96);
+  }
+}
+.toast[data-leaving] {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transition-duration: 0.18s;
+}
+
+/* Intrare în cascadă pentru grile de carduri (decorativ, scurt) */
+.stagger > * {
+  animation: rise-in 0.32s var(--ease-out-strong) backwards;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.stagger > *:nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--foreground) 6%, transparent) 25%,
+    color-mix(in srgb, var(--foreground) 11%, transparent) 37%,
+    color-mix(in srgb, var(--foreground) 6%, transparent) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Panouri colapsabile: înălțime animată fără JS (0fr → 1fr) */
+.collapse-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s var(--ease-out-strong);
+}
+.collapse-grid[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.collapse-grid > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* mișcare redusă = fără deplasări; rămân doar estompările scurte */
+  .animate-drawer-in,
+  .animate-pop-in,
+  .animate-menu-in,
+  .animate-rise-in,
+  .animate-page-in,
+  .animate-check-in,
+  .animate-bar-grow,
+  .animate-col-grow,
+  .animate-draw-line,
+  .animate-ping-soft,
+  .stagger > *,
+  [data-state] > .overlay-drawer,
+  [data-state] > .overlay-sheet,
+  [data-state] > .overlay-modal {
+    animation: fade-in 0.15s ease-out;
+  }
+  [data-state="closed"] > .overlay-drawer,
+  [data-state="closed"] > .overlay-sheet,
+  [data-state="closed"] > .overlay-modal {
+    animation: fade-out 0.12s ease-out forwards;
+  }
+  .animate-draw-line {
+    stroke-dasharray: none;
+  }
+  .animate-ping-soft {
+    animation: none;
+  }
+  .toast,
+  .toast[data-leaving] {
+    transform: none;
+    transition: opacity 0.15s ease-out;
+  }
+  .collapse-grid {
+    transition: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+}
+
+/* Comutarea temei: culorile trec lin, dar numai cât durează comutarea
+   (altfel orice hover din aplicație ar moșteni tranziția asta). */
+.theme-switching,
+.theme-switching * {
+  transition:
+    background-color 0.24s ease,
+    border-color 0.24s ease,
+    color 0.24s ease,
+    fill 0.24s ease !important;
+}
+
+/* Bara subțire „se încarcă” din capul tabelelor */
+@keyframes loading-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.loading-bar {
+  animation: loading-slide 1s var(--ease-in-out-strong) infinite;
+}
+
+/* Bara de acțiuni în masă: urcă de jos, coboară la deselectare */
+@keyframes bulk-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+@keyframes bulk-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+[data-state="open"] > .bulk-bar {
+  animation: bulk-in 0.24s var(--ease-out-strong);
+}
+[data-state="closed"] > .bulk-bar {
+  animation: bulk-out 0.16s var(--ease-out-strong) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-state] > .bulk-bar {
+    animation: fade-in 0.15s ease-out;
+  }
+  [data-state="closed"] > .bulk-bar {
+    animation: fade-out 0.12s ease-out forwards;
+  }
+  .loading-bar {
+    animation-duration: 2s;
+  }
+}
+
+/* Tooltip: crește din elementul pe care îl explică (125ms, fără deplasare) */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+.tooltip-in {
+  animation: tooltip-in 0.125s var(--ease-out-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tooltip-in {
+    animation: fade-in 0.1s ease-out;
+  }
+}
+
+/* Câmp completat automat: o clipire lime, ca omul să vadă CE s-a completat */
+@keyframes field-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mobo-lime) 0%, transparent);
+    background-color: color-mix(in srgb, var(--mobo-lime) 22%, transparent);
+  }
+  35% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--mobo-lime) 22%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+    background-color: transparent;
+  }
+}
+.field-flash {
+  animation: field-flash 1s var(--ease-out-strong);
+}
+
+/* Totalul din wizard: o tresărire scurtă la fiecare schimbare de preț */
+@keyframes total-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.08);
+    color: var(--primary);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-total-bump {
+  animation: total-bump 0.32s var(--ease-out-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-total-bump {
+    animation: none;
+  }
 }

@@ -1,0 +1,851 @@
+// MOBO CRM — schema completă
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Personal / RBAC ───────────────────────────
+
+model Staff {
+  id               Int               @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  username         String            @unique
+  passwordHash     String
+  email            String?
+  street           String?
+  city             String?
+  zipCode          String?
+  country          String?
+  joinDate         DateTime?
+  leaveDate        DateTime?
+  employeeId       String?
+  active           Boolean           @default(true)
+  // Autentificare în doi pași (TOTP) — obligatorie pentru stratul financiar
+  totpSecret        String?   // secret base32, criptat AES-256-GCM; null = 2FA neconfigurat
+  totpEnabledAt     DateTime?
+  totpLastStep      Int?      // ultimul pas TOTP acceptat (anti-reutilizare a aceluiași cod)
+  totpRecoveryCodes String[]  @default([]) // hash-uri SHA-256 ale codurilor de recuperare nefolosite
+  departmentId     Int?
+  department       Department?       @relation(fields: [departmentId], references: [id])
+  roleId           Int?
+  role             Role?             @relation(fields: [roleId], references: [id])
+  designationId    Int?
+  designation      Designation?      @relation(fields: [designationId], references: [id])
+  employmentStatusId Int?
+  employmentStatus EmploymentStatus? @relation(fields: [employmentStatusId], references: [id])
+  shiftId          Int?
+  shift            Shift?            @relation(fields: [shiftId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  contacts         Contact[]         @relation("ContactResponsible")
+  opportunities    Opportunity[]
+  quotes           Quote[]
+  notesAuthored    Note[]            @relation("NoteAuthor")
+  notesReceived    Note[]            @relation("NoteRecipient")
+  attachmentsOwned Attachment[]      @relation("AttachmentOwner")
+  attachmentsReported Attachment[]   @relation("AttachmentReportTo")
+  tasks            Task[]
+  emails           Email[]
+  notifications    Notification[]
+  pushSubscriptions PushSubscription[]
+  auditLogs        AuditLog[]
+  quoteVersions    QuoteVersion[]
+}
+
+model Department {
+  id        Int      @id @default(autoincrement())
+  name      String
+  staff     Staff[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Designation {
+  id        Int      @id @default(autoincrement())
+  name      String
+  staff     Staff[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmploymentStatus {
+  id        Int      @id @default(autoincrement())
+  name      String
+  color     String?
+  staff     Staff[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shift {
+  id        Int      @id @default(autoincrement())
+  name      String
+  startTime String?
+  endTime   String?
+  staff     Staff[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  staff       Staff[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  roles     RolePermission[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  roleId       Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId Int
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+}
+
+// ─────────────────────────── Clienți ───────────────────────────
+
+model ContactStage {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  order               Int       @default(0)
+  // Reguli de tranziție configurabile [NOU]
+  requireContract     Boolean   @default(false)
+  require2D           Boolean   @default(false)
+  require3D           Boolean   @default(false)
+  requireFailureCause Boolean   @default(false)
+  notifyOnEnter       Boolean   @default(false)
+  contacts            Contact[]
+  history             ContactStageHistory[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model ContactSource {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String    @default("00") // primele 2 cifre din ID-ul uman
+  contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model FailureCause {
+  id        Int       @id @default(autoincrement())
+  name      String
+  contacts  Contact[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ProductionSequence {
+  id            Int           @id @default(autoincrement())
+  name          String
+  contacts      Contact[]
+  opportunities Opportunity[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Contact {
+  id                   Int                 @id @default(autoincrement())
+  humanId              String              @unique // ex. 01/209/09/26
+  firstName            String
+  lastName             String
+  email                String?
+  phone                String?
+  idnp                 String?
+  birthDate            DateTime?
+  deliveryAddress      String?
+  homeAddress          String?
+  presentCountry       String?
+  nextAction           String?
+  nextActionDate       DateTime?
+  staffId              Int?
+  staff                Staff?              @relation("ContactResponsible", fields: [staffId], references: [id])
+  companyId            Int?
+  company              Company?            @relation(fields: [companyId], references: [id])
+  stageId              Int?
+  stage                ContactStage?       @relation(fields: [stageId], references: [id])
+  sourceId             Int?
+  source               ContactSource?      @relation(fields: [sourceId], references: [id])
+  failureCauseId       Int?
+  failureCause         FailureCause?       @relation(fields: [failureCauseId], references: [id])
+  productionSequenceId Int?
+  productionSequence   ProductionSequence? @relation(fields: [productionSequenceId], references: [id])
+  stageEnteredAt       DateTime            @default(now())
+  deletedAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  rooms         Room[]
+  opportunities Opportunity[]
+  contracts     Contract[]
+  offers        Offer[]
+  notes         Note[]
+  attachments   Attachment[]
+  tasks         Task[]
+  emails        Email[]
+  stageHistory  ContactStageHistory[]
+}
+
+model ContactStageHistory {
+  id        Int          @id @default(autoincrement())
+  contactId Int
+  contact   Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stageId   Int
+  stage     ContactStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  enteredAt DateTime     @default(now())
+  leftAt    DateTime?
+}
+
+// ─────────────────────────── Camere ───────────────────────────
+
+model RoomType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  elements  String[] @default([])
+  rooms     Room[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id            Int           @id @default(autoincrement())
+  name          String
+  contactId     Int
+  contact       Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  roomTypeId    Int?
+  roomType      RoomType?     @relation(fields: [roomTypeId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  opportunities Opportunity[]
+  attachments   Attachment[]
+  offers        Offer[]
+  contracts     ContractRoom[]
+}
+
+// ─────────────────────────── Proiecte ───────────────────────────
+
+model OpportunityStage {
+  id            Int           @id @default(autoincrement())
+  name          String
+  order         Int           @default(0)
+  phase         String?       // productie / logistica / post-vanzare [NOU]
+  opportunities Opportunity[]
+  history       OpportunityStageHistory[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model OpportunityType {
+  id            Int           @id @default(autoincrement())
+  name          String
+  opportunities Opportunity[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model OpportunitySource {
+  id            Int           @id @default(autoincrement())
+  name          String
+  opportunities Opportunity[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Opportunity {
+  id                   Int                 @id @default(autoincrement())
+  name                 String
+  roomId               Int?
+  room                 Room?               @relation(fields: [roomId], references: [id])
+  contactId            Int?
+  contact              Contact?            @relation(fields: [contactId], references: [id])
+  staffId              Int?
+  staff                Staff?              @relation(fields: [staffId], references: [id])
+  startDate            DateTime?
+  closeDate            DateTime?
+  deliveryDate         DateTime?
+  description          String?
+  sinecost             Float?
+  stageId              Int?
+  stage                OpportunityStage?   @relation(fields: [stageId], references: [id])
+  typeId               Int?
+  type                 OpportunityType?    @relation(fields: [typeId], references: [id])
+  sourceId             Int?
+  source               OpportunitySource?  @relation(fields: [sourceId], references: [id])
+  nextStep             String?
+  competitors          String?
+  productionSequenceId Int?
+  productionSequence   ProductionSequence? @relation(fields: [productionSequenceId], references: [id])
+  stageEnteredAt       DateTime            @default(now())
+  onProductionBoard    Boolean             @default(false)
+  deletedAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  quotes       Quote[]
+  tasks        Task[]
+  notes        Note[]
+  attachments  Attachment[]
+  emails       Email[]
+  contracts    ContractOpportunity[]
+  stageHistory OpportunityStageHistory[]
+}
+
+model OpportunityStageHistory {
+  id            Int              @id @default(autoincrement())
+  opportunityId Int
+  opportunity   Opportunity      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  stageId       Int
+  stage         OpportunityStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  enteredAt     DateTime         @default(now())
+  leftAt        DateTime?
+}
+
+// ─────────────────────────── Estimări ───────────────────────────
+
+model QuoteStage {
+  id        Int      @id @default(autoincrement())
+  name      String
+  quotes    Quote[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Quote {
+  id                    Int         @id @default(autoincrement())
+  name                  String
+  opportunityId         Int
+  opportunity           Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  staffId               Int?
+  staff                 Staff?      @relation(fields: [staffId], references: [id])
+  quoteDate             DateTime    @default(now())
+  expirationDate        DateTime?
+  totalPrice            Float       @default(0) // MDL, după reducere
+  minPriceEur           Float       @default(0)
+  minPriceMdl           Float       @default(0)
+  offerPriceEur         Float       @default(0)
+  offerPriceMdl         Float       @default(0)
+  discountEur           Float       @default(0)
+  stageId               Int?
+  stage                 QuoteStage? @relation(fields: [stageId], references: [id])
+  config                Json?
+  active                Boolean     @default(true)
+  deletedAt             DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  notes       Note[]
+  attachments Attachment[]
+  emails      Email[]
+  versions    QuoteVersion[]
+}
+
+model QuoteVersion {
+  id        Int      @id @default(autoincrement())
+  quoteId   Int
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  config    Json
+  prices    Json
+  staffId   Int?
+  staff     Staff?   @relation(fields: [staffId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────── Produse ───────────────────────────
+
+enum Unit {
+  M2
+  ML
+  BUC
+}
+
+model ProductCategory {
+  id        Int                 @id @default(autoincrement())
+  name      String
+  products  ProductOnCategory[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model Product {
+  id           Int                 @id @default(autoincrement())
+  name         String
+  subcategory  String?
+  unit         Unit                @default(BUC)
+  pricePerUnit Float               @default(0)
+  image        String?
+  sku          String?
+  supplier     String?
+  categories   ProductOnCategory[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model ProductOnCategory {
+  productId  Int
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId Int
+  category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+}
+
+// ─────────────────────────── Persoane Juridice ───────────────────────────
+
+model CompanyType {
+  id        Int       @id @default(autoincrement())
+  name      String
+  companies Company[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Industry {
+  id        Int       @id @default(autoincrement())
+  name      String
+  companies Company[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Company {
+  id            Int          @id @default(autoincrement())
+  name          String
+  adminName     String?
+  phone         String?
+  email         String?
+  idno          String?
+  vatCode       String?
+  iban          String?
+  bic           String?
+  bankName      String?
+  legalStreet   String?
+  legalCity     String?
+  legalZip      String?
+  officeStreet  String?
+  officeCity    String?
+  officeZip     String?
+  typeId        Int?
+  type          CompanyType? @relation(fields: [typeId], references: [id])
+  size          String?
+  annualRevenue Float?
+  industryId    Int?
+  industry      Industry?    @relation(fields: [industryId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  contacts    Contact[]
+  contracts   Contract[]
+  notes       Note[]
+  attachments Attachment[]
+  emails      Email[]
+}
+
+// ─────────────────────────── Contracte / Oferte ───────────────────────────
+
+enum ContractKind {
+  CLIENT
+  COMPANY
+  HANDOVER
+}
+
+enum DocLanguage {
+  RO
+  RU
+}
+
+enum ContractStatus {
+  DRAFT
+  SEMNAT
+  ANULAT
+}
+
+model Contract {
+  id                 Int             @id @default(autoincrement())
+  number             Int             @unique @default(autoincrement())
+  fileName           String
+  kind               ContractKind    @default(CLIENT)
+  status             ContractStatus  @default(DRAFT)
+  contactId          Int?
+  contact            Contact?        @relation(fields: [contactId], references: [id])
+  companyId          Int?
+  company            Company?        @relation(fields: [companyId], references: [id])
+  retribution        Float?
+  financialGuarantee Float           @default(15)
+  beneficiaryPercent Float           @default(15)
+  language           DocLanguage     @default(RO)
+  filePath           String?
+  signedFilePath     String?
+  idnp               String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  rooms         ContractRoom[]
+  opportunities ContractOpportunity[]
+  finance       ContractFinance?
+  payments      Payment[]
+  transactions  Transaction[]
+}
+
+model ContractRoom {
+  contractId Int
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  roomId     Int
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([contractId, roomId])
+}
+
+model ContractOpportunity {
+  contractId    Int
+  contract      Contract    @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  opportunityId Int
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@id([contractId, opportunityId])
+}
+
+model Offer {
+  id              Int         @id @default(autoincrement())
+  fileName        String
+  contactId       Int
+  contact         Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  roomId          Int?
+  room            Room?       @relation(fields: [roomId], references: [id])
+  showStagePrices Boolean     @default(true)
+  language        DocLanguage @default(RO)
+  filePath        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// ─────────────────────────── Finanțe per contract ───────────────────────────
+
+model ContractFinance {
+  id                    Int      @id @default(autoincrement())
+  contractId            Int      @unique
+  contract              Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  sinecost              Float    @default(0) // lei
+  prodPrice             Float    @default(0) // lei
+  contractSumEur        Float    @default(0)
+  avans1                Float    @default(0)
+  avans2                Float    @default(0)
+  avans3                Float    @default(0)
+  avansProducere        Float    @default(0)
+  transaFinalaProducere Float    @default(0)
+  procentQc             Float    @default(0)
+  cadou                 Float    @default(0)
+  reducere              Float    @default(0)
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+}
+
+model Payment {
+  id         Int      @id @default(autoincrement())
+  contractId Int
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  date       DateTime @default(now())
+  amountEur  Float
+  method     String?  // numerar / transfer / card
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// ─────────────────────────── Mesaje / Atașamente / Sarcini / Email ───────────────────────────
+
+model Note {
+  id            Int          @id @default(autoincrement())
+  title         String
+  body          String?
+  authorId      Int?
+  author        Staff?       @relation("NoteAuthor", fields: [authorId], references: [id])
+  recipientId   Int?
+  recipient     Staff?       @relation("NoteRecipient", fields: [recipientId], references: [id])
+  contactId     Int?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId     Int?
+  company       Company?     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunityId Int?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  quoteId       Int?
+  quote         Quote?       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  taskId        Int?
+  task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum AttachmentType {
+  ATASAMENT
+  PROIECT2D
+  PROIECT3D
+  CONTRACT
+  OFERTA
+  MASURARI
+}
+
+model Attachment {
+  id            Int            @id @default(autoincrement())
+  name          String
+  filePath      String
+  mime          String?
+  size          Int?
+  type          AttachmentType @default(ATASAMENT)
+  staffId       Int?
+  staff         Staff?         @relation("AttachmentOwner", fields: [staffId], references: [id])
+  reportToId    Int?
+  reportTo      Staff?         @relation("AttachmentReportTo", fields: [reportToId], references: [id])
+  contactId     Int?
+  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId     Int?
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  roomId        Int?
+  room          Room?          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  opportunityId Int?
+  opportunity   Opportunity?   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  quoteId       Int?
+  quote         Quote?         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model TaskType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TaskStatus {
+  id        Int      @id @default(autoincrement())
+  name      String
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TaskPriority {
+  id        Int      @id @default(autoincrement())
+  name      String
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id            Int           @id @default(autoincrement())
+  name          String
+  description   String?
+  assigneeId    Int?
+  assignee      Staff?        @relation(fields: [assigneeId], references: [id])
+  typeId        Int?
+  type          TaskType?     @relation(fields: [typeId], references: [id])
+  statusId      Int?
+  status        TaskStatus?   @relation(fields: [statusId], references: [id])
+  priorityId    Int?
+  priority      TaskPriority? @relation(fields: [priorityId], references: [id])
+  opportunityId Int?
+  opportunity   Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contactId     Int?
+  contact       Contact?      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dueDate       DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  notes         Note[]
+}
+
+enum EmailStatus {
+  TRIMIS
+  ESUAT
+  PROGRAMAT
+}
+
+model Email {
+  id            Int          @id @default(autoincrement())
+  subject       String
+  body          String
+  to            String
+  status        EmailStatus  @default(PROGRAMAT)
+  error         String?
+  staffId       Int?
+  staff         Staff?       @relation(fields: [staffId], references: [id])
+  contactId     Int?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId     Int?
+  company       Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunityId Int?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  quoteId       Int?
+  quote         Quote?       @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model EmailConfig {
+  id       Int     @id @default(1)
+  host     String?
+  port     Int?    @default(587)
+  user     String?
+  pass     String?
+  from     String?
+  secure   Boolean @default(false)
+  updatedAt DateTime @updatedAt @default(now())
+}
+
+// ─────────────────────────── Contabilitate ───────────────────────────
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  CAPITAL
+  WITHDRAWAL
+  REVENUE
+  EXPENSE
+}
+
+model Account {
+  id           Int           @id @default(autoincrement())
+  name         String
+  type         AccountType
+  debits       Transaction[] @relation("DebitAccount")
+  credits      Transaction[] @relation("CreditAccount")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Transaction {
+  id              Int      @id @default(autoincrement())
+  date            DateTime @default(now())
+  debitAccountId  Int
+  debitAccount    Account  @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccountId Int
+  creditAccount   Account  @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  amount          Float
+  description     String?
+  contractId      Int?
+  contract        Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─────────────────────────── Setup diverse ───────────────────────────
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Award {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  date        DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Partner {
+  id                Int      @id @default(autoincrement())
+  name              String
+  phone             String?
+  commissionPercent Float    @default(10)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DesignerPartner {
+  id                Int      @id @default(autoincrement())
+  name              String
+  phone             String?
+  commissionPercent Float    @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Organization {
+  id              Int      @id @default(1)
+  name            String   @default("Mobo kitchens & home")
+  idno            String?
+  vatCode         String?
+  address         String?
+  phone           String?
+  email           String?
+  logo            String?
+  iban            String?
+  bic             String?
+  bankName        String?
+  // Procente Bord Finanțe (configurabile) [NOU]
+  partnerPercent  Float    @default(10)
+  designerPercent Float    @default(5)
+  qcDefault       Float    @default(1200)
+  updatedAt       DateTime @updatedAt @default(now())
+}
+
+// Catalogul de prețuri al wizard-ului (istoric versiuni) [NOU]
+model CalcCatalog {
+  id        Int      @id @default(autoincrement())
+  name      String   @default("Catalog Prețuri și Coeficienți Producție")
+  active    Boolean  @default(true)
+  data      Json
+  validFrom DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────── Notificări / Push / Audit ───────────────────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  staffId   Int
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  text      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  staffId   Int
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  staffId   Int?
+  staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  action    String   // create / update / delete / login / stage-change
+  entity    String
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+}

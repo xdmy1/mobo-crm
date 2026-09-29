@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mobo_crm
+      POSTGRES_USER: mobo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-schimba-parola}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mobo -d mobo_crm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://mobo:${POSTGRES_PASSWORD:-schimba-parola}@db:5432/mobo_crm
+      SESSION_SECRET: ${SESSION_SECRET:?setati SESSION_SECRET in .env}
+      TOTP_SECRET_KEY: ${TOTP_SECRET_KEY:-}
+      PUBLIC_API_KEY: ${PUBLIC_API_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@mobo.md}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  uploads:
