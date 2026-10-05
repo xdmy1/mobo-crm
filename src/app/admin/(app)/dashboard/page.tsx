@@ -13,7 +13,7 @@ import {
 import { prisma } from "@/lib/db";
 import { financeAccess } from "@/lib/financeAccess";
 import { requireUser } from "@/lib/auth";
-import { fmtDateTime, fmtDate, fmtEur, fmtLei, fmtDuration, ymdChisinau, EMPTY } from "@/lib/format";
+import { fmtDateTime, fmtDate, fmtEur, fmtLei, fmtDuration, EMPTY } from "@/lib/format";
 import { personName } from "@/lib/people";
 import { portfolioSum } from "@/lib/sums";
 import { contactStageColor, taskPriority } from "@/lib/status";
@@ -185,19 +185,6 @@ export default async function DashboardPage({
     include: { stage: true },
   });
 
-  // De urmărit [NOU]: clienții cu „următoarea acțiune” scadentă azi sau întârziată
-  const endOfToday = new Date(`${ymdChisinau(now)}T23:59:59`);
-  const followUps = await prisma.contact.findMany({
-    where: {
-      deletedAt: null,
-      nextActionDate: { lte: endOfToday },
-      ...(user.isAdmin ? {} : { OR: [{ staffId: user.id }, { staffId: null }] }),
-    },
-    orderBy: { nextActionDate: "asc" },
-    take: 8,
-    include: { stage: true, staff: true },
-  });
-
   const statContracts = contractsInRange.length;
   const statSales = contractsInRange.reduce((s, c) => s + (c.retribution ?? 0), 0);
   const statAdvances = financesInRange.reduce((s, f) => s + f.avans1 + f.avans2 + f.avans3, 0);
@@ -273,49 +260,6 @@ export default async function DashboardPage({
           tone="green"
         />
       </div>
-
-      {/* De urmărit azi [NOU] — apare doar când ai pe cine suna */}
-      {followUps.length > 0 && (
-        <Card
-          title={
-            <span className="flex items-center gap-2">
-              <span className="relative grid h-2 w-2 place-items-center">
-                <span className="absolute inset-0 rounded-full bg-lime-brand animate-ping-soft" />
-                <span className="relative h-2 w-2 rounded-full bg-lime-brand ring-1 ring-inset ring-black/15" />
-              </span>
-              De urmărit azi
-              <span className="rounded-full bg-foreground/[0.06] px-1.5 text-xs font-medium tabular-nums text-muted">
-                {followUps.length}
-              </span>
-            </span>
-          }
-          flush
-        >
-          <ul className="grid divide-border sm:grid-cols-2 sm:divide-x">
-            {followUps.map((c) => {
-              const late = ymdChisinau(c.nextActionDate!) < ymdChisinau(now);
-              return (
-                <li key={c.id} className="border-b border-border/70 last:border-b-0">
-                  <Link
-                    href={`/admin/contact/${c.id}`}
-                    className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-subtle/60"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{personName(c)}</span>
-                      <span className="block truncate text-xs text-muted">{c.nextAction || "Revin la client"}</span>
-                    </span>
-                    {c.phone && <span className="hidden shrink-0 text-xs tabular-nums text-muted md:block">{c.phone}</span>}
-                    <Badge color={contactStageColor(c.stage?.name)}>{c.stage?.name ?? EMPTY}</Badge>
-                    <span className={`w-[74px] shrink-0 text-right text-xs font-semibold ${late ? "text-danger" : "text-primary"}`}>
-                      {late ? fmtDate(c.nextActionDate) : "Azi"}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
 
       {/* Statistică */}
       <Card title="Statistică" extra={<DashFilters staff={staff} />} flush>

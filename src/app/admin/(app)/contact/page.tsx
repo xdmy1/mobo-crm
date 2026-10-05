@@ -57,6 +57,12 @@ export default async function ContactsPage({
       },
       { name: "sourceId", label: "Sursă", type: "select", options: sources },
       { name: "companyId", label: "Persoană juridică", type: "select", options: companies },
+      {
+        name: "comment",
+        label: "Comentariu",
+        type: "textarea",
+        placeholder: "Ce trebuie să știe oricine deschide fișa — apare sus, sub nume",
+      },
     ],
   };
 

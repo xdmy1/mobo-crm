@@ -5,14 +5,7 @@ import { T, tpl, type Lang } from "./texts";
 import { fmtDate, fmtEur, fmtLei, fmtEurLei, fmtNumber, EMPTY } from "@/lib/format";
 import type { QuoteConfig } from "@/lib/calc/engine";
 import { computeQuote } from "@/lib/calc/engine";
-import {
-  BODY_BRAND_LABELS,
-  BODY_FINISH_LABELS,
-  FACADE_LABELS,
-  FURNITURE_LABELS,
-  WORKTOP_LABELS,
-  type CalcCatalogData,
-} from "@/lib/calc/catalog";
+import { FURNITURE_LABELS, type CalcCatalogData } from "@/lib/calc/catalog";
 
 interface OrgInfo {
   name: string;
@@ -251,22 +244,15 @@ export async function generateQuoteTablePdf(d: QuoteTableData): Promise<Buffer> 
 
   if (d.config) {
     const c = d.config;
+    // antetul spune CE fel de mobilier e; materialele și accesoriile sunt în tabel (nimic de două ori)
     const specs: Array<[string, string]> = [];
     if (c.furnitureType) specs.push(["Tip", FURNITURE_LABELS[c.furnitureType]]);
-    if (c.qualityLevel) specs.push(["Mod", c.qualityLevel]);
+    if (c.qualityLevel) specs.push(["Nivel", c.qualityLevel === "PREMIUM" ? "Premium" : "Standard"]);
     if (c.lengthMm && c.heightMm)
       specs.push([
         "Dimensiuni",
         `${fmtNumber(c.lengthMm / 1000)} m × ${fmtNumber(c.heightMm / 1000)} m (A: ${c.depth ?? EMPTY} mm)`,
       ]);
-    if (c.bodyBrand)
-      specs.push([
-        "Corp",
-        `${BODY_BRAND_LABELS[c.bodyBrand]}${c.bodyFinish ? ` – ${BODY_FINISH_LABELS[c.bodyFinish]}` : ""}`,
-      ]);
-    if (c.facade) specs.push(["Fațadă", FACADE_LABELS[c.facade]]);
-    if (c.worktop)
-      specs.push(["Blat", `${WORKTOP_LABELS[c.worktop.material]} — ${c.worktop.sqm} m²`]);
 
     doc.font("body").fontSize(10);
     for (const [k, v] of specs) {
@@ -274,13 +260,15 @@ export async function generateQuoteTablePdf(d: QuoteTableData): Promise<Buffer> 
     }
     doc.moveDown(0.8);
 
+    // documentul pleacă la client: pe rând doar ce este și din ce e făcut (material, tip, bucăți) —
+    // fără costuri, prețuri pe m² sau metraj
     const r = computeQuote({ ...c, manualDiscountMdl: d.discountEur * d.catalog.cursEuro }, d.catalog);
     const startX = 50;
-    const cols = [170, 220, 105];
+    const cols = [215, 280];
     let y = doc.y;
     doc.save().rect(startX, y - 2, 495, 18).fill("#f0efe8").restore();
     doc.font("bold").fontSize(9);
-    [t.component, t.details, t.cost].forEach((h, i) =>
+    [t.component, t.details].forEach((h, i) =>
       doc.text(h, startX + cols.slice(0, i).reduce((a, b) => a + b, 0) + 4, y + 2, {
         width: cols[i] - 8,
       })
@@ -289,11 +277,7 @@ export async function generateQuoteTablePdf(d: QuoteTableData): Promise<Buffer> 
     doc.font("body").fontSize(9);
     for (const b of r.breakdown) {
       doc.text(b.label, startX + 4, y + 2, { width: cols[0] - 8 });
-      doc.text(b.detail, startX + cols[0] + 4, y + 2, { width: cols[1] - 8 });
-      doc.text(fmtLei(b.amountMdl), startX + cols[0] + cols[1] + 4, y + 2, {
-        width: cols[2] - 8,
-        align: "right",
-      });
+      doc.text(b.spec, startX + cols[0] + 4, y + 2, { width: cols[1] - 8 });
       y += 16;
       if (y > 740) {
         doc.addPage();
@@ -302,15 +286,17 @@ export async function generateQuoteTablePdf(d: QuoteTableData): Promise<Buffer> 
     }
     const st = d.stored;
     const curs = st?.cursEuro || d.catalog.cursEuro;
-    const minMdl = st?.minPriceMdl ?? r.minPriceMdl;
     const offerMdl = st?.offerPriceMdl ?? r.offerPriceMdl;
     const totalMdl = st?.totalPrice ?? r.totalMdl;
-    const totals: Array<[string, string, boolean]> = [
-      [t.minPrice, fmtEurLei(minMdl / curs, minMdl), false],
-      [t.offerPrice, fmtEurLei(offerMdl / curs, offerMdl), false],
-      [t.discount, `−${fmtLei(Math.max(0, offerMdl - totalMdl))}`, false],
-      [t.totalAfter, fmtEurLei(totalMdl / curs, totalMdl), true],
-    ];
+    const discountMdl = Math.max(0, offerMdl - totalMdl);
+    const totals: Array<[string, string, boolean]> =
+      discountMdl > 0.005
+        ? [
+            [t.offerPrice, fmtEurLei(offerMdl / curs, offerMdl), false],
+            [t.discount, `−${fmtLei(discountMdl)}`, false],
+            [t.totalAfter, fmtEurLei(totalMdl / curs, totalMdl), true],
+          ]
+        : [[t.total, fmtEurLei(totalMdl / curs, totalMdl), true]];
     y += 6;
     // blocul de totaluri nu se rupe între pagini
     if (y > 700) {

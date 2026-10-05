@@ -67,6 +67,7 @@ import { FINANCE_UNLOCK_MINUTES, type FinanceShellState } from "@/lib/financeSha
 import { Avatar } from "@/components/ui/Misc";
 import { useToast } from "@/components/ui/Toast";
 import { TooltipLayer } from "@/components/ui/Tooltip";
+import { MessageAlert } from "@/components/layout/MessageAlert";
 import { usePresence } from "@/lib/usePresence";
 import { cn } from "@/lib/cn";
 import { CrumbProvider, useCrumbLeaf } from "./Crumb";
@@ -866,6 +867,7 @@ function Shell({ userName, userRole, canFinances, finance, children }: ShellProp
       </div>
 
       <TooltipLayer />
+      <MessageAlert />
       <Modal open={financeOpen} onClose={() => setFinanceOpen(false)} title="Deblochează finanțele" width={420}>
         <p className="mb-4 text-[13px] leading-relaxed text-muted">
           Stratul financiar se deschide pentru {FINANCE_UNLOCK_MINUTES} minute, apoi se blochează singur.

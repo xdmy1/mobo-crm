@@ -114,7 +114,7 @@ export const WORKTOP_LABELS: Record<WorktopMaterial, string> = {
 
 export const GLASS_LABELS: Record<GlassKind, string> = {
   SIMPLA: "Simplă",
-  DIAMOND: "Diamond",
+  DIAMOND: "Diamant",
   TONATA: "Tonată",
 };
 

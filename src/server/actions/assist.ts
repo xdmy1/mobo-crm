@@ -90,24 +90,3 @@ export async function quickProject(values: {
   revalidatePath("/admin", "layout");
   return { ok: true, id: opp.id, redirect: `/admin/opportunity/${opp.id}?wizard=1` };
 }
-
-/** Următoarea acțiune pe client („sună joi pentru măsurare”) — apare pe dashboard în ziua respectivă. */
-export async function setNextAction(
-  contactId: number,
-  text: string | null,
-  date: string | null
-): Promise<ActionResult> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Neautentificat" };
-  if (!can(user, "update-contact")) return { ok: false, error: "Nu ai permisiunea necesară." };
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      nextAction: text?.trim() || null,
-      // la prânz, ca ziua să rămână aceeași indiferent de fusul orar al serverului
-      nextActionDate: date ? new Date(`${date}T12:00:00`) : null,
-    },
-  });
-  revalidatePath("/admin", "layout");
-  return { ok: true };
-}

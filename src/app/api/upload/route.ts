@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import crypto from "crypto";
 import { getCurrentUser } from "@/lib/auth";
+import { putFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
-
-const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || "./uploads");
 
 // păstrează diacriticele corect (UTF-8), elimină doar caracterele periculoase [NOU]
 function safeName(name: string): string {
@@ -22,7 +19,6 @@ export async function POST(req: NextRequest) {
   if (!files.length)
     return NextResponse.json({ error: "Niciun fișier" }, { status: 400 });
 
-  await mkdir(UPLOADS_DIR, { recursive: true });
   const out = [];
   for (const file of files) {
     const buf = Buffer.from(await file.arrayBuffer());
@@ -31,7 +27,7 @@ export async function POST(req: NextRequest) {
     const id = crypto.randomUUID();
     const name = safeName(file.name || "fisier");
     const stored = `${id}__${name}`;
-    await writeFile(path.join(UPLOADS_DIR, stored), buf);
+    await putFile(stored, buf, file.type || null);
     out.push({
       path: stored,
       name,

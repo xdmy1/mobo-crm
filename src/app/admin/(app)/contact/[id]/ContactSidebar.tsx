@@ -25,7 +25,7 @@ import { Avatar } from "@/components/ui/Misc";
 import { useToast } from "@/components/ui/Toast";
 import { saveRecord, deleteRecords } from "@/server/actions/crud";
 import type { SelectOption } from "@/lib/listTypes";
-import { NextAction } from "./NextAction";
+import { ContactComment } from "./ContactComment";
 
 interface ContactData {
   id: number;
@@ -34,8 +34,7 @@ interface ContactData {
   lastName: string;
   email: string | null;
   phone: string | null;
-  nextAction: string | null;
-  nextActionDate: string | null;
+  comment: string | null;
   idnp: string | null;
   birthDate: string | null;
   deliveryAddress: string | null;
@@ -138,7 +137,7 @@ export function ContactSidebar({
         )}
       </div>
 
-      <NextAction contactId={contact.id} text={contact.nextAction} date={contact.nextActionDate} />
+      <ContactComment contactId={contact.id} value={contact.comment} />
 
       <div className="space-y-3 border-t border-border pt-4">
         <SideSelect

@@ -15,10 +15,10 @@ const STEPS: Array<{ title: string; body: string; href: string; cta: string }> =
     cta: "Bord Vânzări",
   },
   {
-    title: "Îl suni și notezi ce urmează",
-    body: "În fișa clientului scrii următorul pas și apeși Azi, Mâine sau +3 zile. În ziua aceea clientul apare sus pe Bord Central, cu telefonul lângă.",
-    href: "/admin/dashboard",
-    cta: "Bord Central",
+    title: "Îl suni și lași un comentariu",
+    body: "În fișa clientului, sus sub nume, scrii ce s-a vorbit. Oricine deschide fișa îl vede primul. Etapa o schimbi din bara de parcurs de sus.",
+    href: "/admin/contact",
+    cta: "Persoane Fizice",
   },
   {
     title: "Măsurare și camere",

@@ -22,6 +22,7 @@ import {
 } from "@/server/options";
 import { PageHeader, StatCard } from "@/components/layout/PageHeader";
 import { OpportunityPanels } from "./OpportunityPanels";
+import { noteReadCell } from "@/lib/messages";
 import type { PanelRow } from "../../contact/[id]/ContactPanels";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export default async function OpportunityDetailPage({
           _count: { select: { notes: true } },
         },
       },
-      notes: { orderBy: { createdAt: "desc" }, include: { author: true } },
+      notes: { orderBy: { createdAt: "desc" }, include: { author: true, recipient: true } },
       stageHistory: { select: { stageId: true } },
       attachments: { orderBy: { createdAt: "desc" }, include: { staff: true } },
     },
@@ -148,7 +149,9 @@ export default async function OpportunityDetailPage({
       { text: n.title },
       { text: n.body ?? "—" },
       { text: fmtDateTime(n.createdAt) },
-      { text: n.author ? `${n.author.firstName} ${n.author.lastName}` : "—" },
+      { text: personName(n.author) },
+      { text: personName(n.recipient) },
+      noteReadCell(n),
     ],
   }));
 

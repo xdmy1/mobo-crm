@@ -1,6 +1,15 @@
 // Motorul de calcul al estimării tehnice (§8 din spec).
 // Pur, testabil, fără dependențe de DB — catalogul vine ca parametru.
 
+import {
+  BODY_BRAND_LABELS,
+  BODY_FINISH_LABELS,
+  FACADE_LABELS,
+  GLASS_LABELS,
+  MECHANISM_LABELS,
+  ORGANIZER_LABELS,
+  WORKTOP_LABELS,
+} from "./catalog";
 import type {
   BodyBrand,
   BodyFinish,
@@ -75,7 +84,10 @@ export const EMPTY_CONFIG: QuoteConfig = {
 
 export interface BreakdownLine {
   label: string;
+  /** calculul, pentru uz intern (m² × preț…) */
   detail: string;
+  /** ce este / din ce e făcut — fără prețuri și metraj; asta vede clientul în PDF */
+  spec: string;
   amountMdl: number;
 }
 
@@ -122,6 +134,7 @@ export function computeQuote(
     breakdown.push({
       label: "Fațadă",
       detail: `${r2(area)} m² × ${price} MDL/m²`,
+      spec: FACADE_LABELS[config.facade],
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -137,6 +150,7 @@ export function computeQuote(
       detail: `${r2(area)} m² × ${base} MDL/m²${
         depthCoef !== 1 ? ` × ${depthCoef} (A:900)` : ""
       }`,
+      spec: `${BODY_BRAND_LABELS[config.bodyBrand]} – ${BODY_FINISH_LABELS[config.bodyFinish]}`,
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -149,9 +163,10 @@ export function computeQuote(
     const amount = d.qty * price;
     breakdown.push({
       label: `Sertar ${d.brand === "blum" ? "Blum" : "Hettich"} ${
-        d.material === "metal" ? "Metal" : "Lemn"
+        d.material === "metal" ? "metal" : "lemn"
       }`,
       detail: `${d.qty} buc × ${price} MDL`,
+      spec: `${d.qty} buc`,
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -162,9 +177,12 @@ export function computeQuote(
     if (m.qty <= 0) continue;
     const price = catalog.mechanisms[m.brand]?.[m.key] ?? 0;
     const amount = m.qty * price;
+    const name = MECHANISM_LABELS[m.key] ?? m.key.replace(/_/g, " ");
     breakdown.push({
-      label: `Mecanism ${m.key.replace(/_/g, " ")}`,
+      // „Mecanism de colț 600” are deja cuvântul în nume
+      label: /^mecanism/i.test(name) ? name : `Mecanism ${name}`,
       detail: `${m.qty} buc × ${price} MDL`,
+      spec: `${m.qty} buc`,
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -176,8 +194,9 @@ export function computeQuote(
     const price = catalog.glassPrices[config.glass.kind] ?? 0;
     const amount = a * price;
     breakdown.push({
-      label: `Sticlă ${config.glass.kind.toLowerCase()}`,
-      detail: `${r2(a)} m² × ${price} MDL/m²`,
+      label: "Sticlă",
+      detail: `${GLASS_LABELS[config.glass.kind]} · ${r2(a)} m² × ${price} MDL/m²`,
+      spec: GLASS_LABELS[config.glass.kind],
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -187,8 +206,9 @@ export function computeQuote(
     const price = catalog.mirrorPrices[config.mirror.kind] ?? 0;
     const amount = a * price;
     breakdown.push({
-      label: `Oglindă ${config.mirror.kind.toLowerCase()}`,
-      detail: `${r2(a)} m² × ${price} MDL/m²`,
+      label: "Oglindă",
+      detail: `${GLASS_LABELS[config.mirror.kind]} · ${r2(a)} m² × ${price} MDL/m²`,
+      spec: GLASS_LABELS[config.mirror.kind],
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -200,8 +220,9 @@ export function computeQuote(
     const price = catalog.organizerPrices[o.key] ?? 0;
     const amount = o.qty * price;
     breakdown.push({
-      label: `Organizator ${o.key.replace(/_/g, " ")}`,
+      label: `Organizator ${(ORGANIZER_LABELS[o.key] ?? o.key.replace(/_/g, " ")).toLowerCase()}`,
       detail: `${o.qty} buc × ${price} MDL`,
+      spec: `${o.qty} buc`,
       amountMdl: r2(amount),
     });
     cost += amount;
@@ -214,6 +235,7 @@ export function computeQuote(
     breakdown.push({
       label: "Blat",
       detail: `${config.worktop.sqm} m² × ${price} MDL/m²`,
+      spec: WORKTOP_LABELS[config.worktop.material],
       amountMdl: r2(amount),
     });
     cost += amount;

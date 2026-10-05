@@ -37,6 +37,15 @@ import {
 } from "@/lib/calc/catalog";
 import { saveQuoteFromWizard } from "@/server/actions/quotes";
 import { fmtNumber, fmtLei, fmtEur } from "@/lib/format";
+import {
+  DRAWER_LABELS,
+  DRAWER_PHOTOS,
+  MECHANISM_PHOTOS,
+  OptionPictogram,
+  hasPictogram,
+  organizerPictogram,
+  type OptionPhoto,
+} from "./optionArt";
 
 const STEP_TITLES = [
   "NIVEL CALITATE",
@@ -327,7 +336,6 @@ export function QuoteWizard({
             value={config.facade}
             onSelect={(v) => patch({ facade: v as FacadeMaterial })}
             compact
-            cols={5}
           />
         )}
 
@@ -366,60 +374,34 @@ export function QuoteWizard({
         )}
 
         {step === 7 && (
-          <div className="grid gap-4 md:grid-cols-2">
-            {(["blum", "hettich"] as const).map((brand) => (
-              <div key={brand} className="rounded-xl border border-border p-4">
-                <ImgPlaceholder label={brand.toUpperCase()} className="mb-3 h-28" />
-                <div className="grid grid-cols-2 gap-2">
-                  {(["metal", "lemn"] as const).map((mat) => (
-                    <button
-                      key={mat}
-                      onClick={() => {
-                        const existing = config.drawers.find(
-                          (d) => d.brand === brand && d.material === mat
-                        );
-                        patch({
-                          drawers: existing
-                            ? config.drawers.map((d) =>
-                                d === existing ? { ...d, qty: d.qty + 1 } : d
-                              )
-                            : [...config.drawers, { brand, material: mat, qty: 1 }],
-                        });
-                      }}
-                      className="rounded-lg bg-foreground/[0.06] px-3 py-2 text-sm font-medium transition-colors hover:bg-primary hover:text-white cursor-pointer"
-                    >
-                      + {mat === "metal" ? "Metal" : "Lemn"}
-                      <span className="ml-1 text-xs opacity-60">
-                        ({catalog.drawerPrices[brand][mat]} MDL)
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {config.drawers.length > 0 && (
-              <div className="md:col-span-2 space-y-2">
-                {config.drawers.map((d, i) => (
-                  <QtyRow
-                    key={`${d.brand}-${d.material}`}
-                    label={`${d.brand.toUpperCase()} — ${d.material.toUpperCase()}`}
-                    qty={d.qty}
+          <OptionGrid>
+            {(["blum", "hettich"] as const).flatMap((brand) =>
+              (["metal", "lemn"] as const).map((mat) => {
+                const id = `${brand}-${mat}`;
+                const qty = config.drawers.find((d) => d.brand === brand && d.material === mat)?.qty ?? 0;
+                const same = (d: QuoteConfig["drawers"][number]) => d.brand === brand && d.material === mat;
+                return (
+                  <OptionCard
+                    key={id}
+                    label={DRAWER_LABELS[id]}
+                    price={catalog.drawerPrices[brand][mat]}
+                    photo={DRAWER_PHOTOS[id]}
+                    qty={qty}
                     onQty={(q) =>
                       patch({
                         drawers:
                           q <= 0
-                            ? config.drawers.filter((_, j) => j !== i)
-                            : config.drawers.map((x, j) => (j === i ? { ...x, qty: q } : x)),
+                            ? config.drawers.filter((d) => !same(d))
+                            : qty === 0
+                              ? [...config.drawers, { brand, material: mat, qty: q }]
+                              : config.drawers.map((d) => (same(d) ? { ...d, qty: q } : d)),
                       })
                     }
-                    onRemove={() =>
-                      patch({ drawers: config.drawers.filter((_, j) => j !== i) })
-                    }
                   />
-                ))}
-              </div>
+                );
+              })
             )}
-          </div>
+          </OptionGrid>
         )}
 
         {(step === 8 || step === 9 || step === 10) && (
@@ -434,44 +416,30 @@ export function QuoteWizard({
         )}
 
         {step === 11 && (
-          <div className="space-y-2">
-            <p className="mb-3 text-sm text-muted">
-              Organizatoare interne (opțional) — prețuri din catalog. <b>[NOU]</b>
-            </p>
+          <OptionGrid>
             {Object.entries(ORGANIZER_LABELS).map(([key, label]) => {
-              const line = config.organizers.find((o) => o.key === key);
+              const qty = config.organizers.find((o) => o.key === key)?.qty ?? 0;
               return (
-                <MechRow
+                <OptionCard
                   key={key}
                   label={label}
                   price={catalog.organizerPrices[key] ?? 0}
-                  qty={line?.qty ?? 0}
-                  onAdd={() =>
-                    patch({
-                      organizers: line
-                        ? config.organizers.map((o) =>
-                            o.key === key ? { ...o, qty: o.qty + 1 } : o
-                          )
-                        : [...config.organizers, { key, qty: 1 }],
-                    })
-                  }
+                  pictogram={organizerPictogram(key)}
+                  qty={qty}
                   onQty={(q) =>
                     patch({
                       organizers:
                         q <= 0
                           ? config.organizers.filter((o) => o.key !== key)
-                          : config.organizers.map((o) =>
-                              o.key === key ? { ...o, qty: q } : o
-                            ),
+                          : qty === 0
+                            ? [...config.organizers, { key, qty: q }]
+                            : config.organizers.map((o) => (o.key === key ? { ...o, qty: q } : o)),
                     })
-                  }
-                  onRemove={() =>
-                    patch({ organizers: config.organizers.filter((o) => o.key !== key) })
                   }
                 />
               );
             })}
-          </div>
+          </OptionGrid>
         )}
 
         {step === 12 && (
@@ -613,7 +581,7 @@ export function QuoteWizard({
                 }`}
               >
                 <span className="shrink-0 text-muted">{row.label}</span>
-                <span className={`truncate text-right font-medium ${row.value ? "" : "text-muted/60"}`}>
+                <span className={`min-w-0 break-words text-right font-medium ${row.value ? "" : "text-muted/60"}`}>
                   {row.value ?? "—"}
                 </span>
               </button>
@@ -720,11 +688,14 @@ function CardGrid({
     5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5",
     6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
   };
-  const grid = cols
-    ? COLS[cols] ?? COLS[4]
-    : large
-      ? "grid-cols-1 sm:grid-cols-2"
-      : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+  // cardurile compacte își iau lățimea de care are nevoie textul — numele și prețul se văd întregi
+  const grid = compact
+    ? "grid-cols-[repeat(auto-fill,minmax(150px,1fr))]"
+    : cols
+      ? COLS[cols] ?? COLS[4]
+      : large
+        ? "grid-cols-1 sm:grid-cols-2"
+        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
   return (
     <div className={`grid gap-3 ${grid}`}>
       {options.map((o) => {
@@ -749,8 +720,8 @@ function CardGrid({
             )}
             <div className={`flex items-center gap-2 px-3 ${compact ? "py-2.5" : "py-2.5"}`}>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold" title={o.label}>{o.label}</p>
-                {o.sub && <p className="truncate text-xs text-muted">{o.sub}</p>}
+                <p className="break-words text-[13px] font-semibold leading-snug">{o.label}</p>
+                {o.sub && <p className="mt-0.5 break-words text-xs text-muted">{o.sub}</p>}
               </div>
               {compact && (
                 <span
@@ -912,102 +883,94 @@ function NumField({
   );
 }
 
-function QtyRow({
-  label,
-  qty,
-  onQty,
-  onRemove,
-  extra,
-}: {
-  label: string;
-  qty: number;
-  onQty: (q: number) => void;
-  onRemove: () => void;
-  extra?: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg bg-foreground/[0.05] px-3 py-2">
-      <span className="text-sm font-semibold">{label}</span>
-      {extra && <span className="text-xs text-muted">{extra}</span>}
-      <div className="ml-auto flex items-center gap-1.5">
-        <button
-          onClick={() => onQty(qty - 1)}
-          className="grid h-7 w-7 place-items-center rounded-md border border-border transition-colors hover:border-primary hover:text-primary cursor-pointer"
-        >
-          <Minus className="h-3.5 w-3.5" />
-        </button>
-        <span className="w-7 text-center text-[13px] font-semibold tabular-nums">{qty}</span>
-        <button
-          onClick={() => onQty(qty + 1)}
-          className="grid h-7 w-7 place-items-center rounded-md border border-border transition-colors hover:border-primary hover:text-primary cursor-pointer"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={onRemove}
-          className="ml-1 grid h-7 w-7 place-items-center rounded-md text-danger transition-colors hover:bg-danger/10 cursor-pointer"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
+/** Grila de carduri cu imagine pentru sertare, mecanisme și organizatoare. */
+function OptionGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-[repeat(auto-fill,minmax(165px,1fr))] gap-3">{children}</div>;
 }
 
-function MechRow({
+/**
+ * Card cu fotografie (sau schița mișcării) + cantitate. Click pe imagine = încă o bucată,
+ * ca la alegerea dintr-un catalog; cardul ales e conturat lime și arată câte bucăți are.
+ */
+function OptionCard({
   label,
   price,
+  photo,
+  pictogram,
   qty,
-  onAdd,
   onQty,
-  onRemove,
 }: {
   label: string;
   price: number;
+  photo?: OptionPhoto;
+  pictogram?: string;
   qty: number;
-  onAdd: () => void;
   onQty: (q: number) => void;
-  onRemove: () => void;
 }) {
+  const active = qty > 0;
+  const stepBtn =
+    "grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md border border-border-strong/70 bg-card transition-[border-color,background-color,transform] duration-150 hover:border-foreground/40 active:scale-90";
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-      <ImgPlaceholder className="h-10 w-14 shrink-0" />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{label}</p>
-        <p className="text-xs text-muted">{price > 0 ? `${price} MDL/buc` : "—"}</p>
-      </div>
-      <div className="ml-auto flex items-center gap-1.5">
-        {qty === 0 ? (
-          <button
-            onClick={onAdd}
-            className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-fg transition-colors hover:bg-primary-hover cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        ) : (
-          <>
-            <span className="mr-1 flex items-center gap-1 text-sm font-semibold text-primary">
-              <Check className="h-4 w-4" /> {qty} buc
-            </span>
-            <button
-              onClick={() => onQty(qty - 1)}
-              className="grid h-7 w-7 place-items-center rounded-md border border-border transition-colors hover:border-primary cursor-pointer"
-            >
+    <div
+      className={`flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-[border-color,box-shadow] duration-150 ${
+        active ? "border-lime-brand ring-[3px] ring-lime-brand/35" : "border-border-strong/70 hover:border-foreground/40"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onQty(qty + 1)}
+        title={`Adaugă o bucată — ${label}`}
+        className="group relative block aspect-[4/3] w-full cursor-pointer overflow-hidden bg-subtle"
+      >
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo.src}
+            alt={label}
+            loading="lazy"
+            style={{ objectPosition: photo.pos }}
+            className="h-full w-full object-cover transition-transform duration-300 ease-[var(--ease-out-strong)] group-hover:scale-[1.03]"
+          />
+        ) : pictogram && hasPictogram(pictogram) ? (
+          <OptionPictogram kind={pictogram} className="h-full w-full p-3 text-foreground/75" />
+        ) : null}
+        {active && (
+          <span className="absolute right-2 top-2 rounded-full bg-create px-2 py-0.5 text-xs font-semibold tabular-nums text-create-fg shadow ring-1 ring-black/10 animate-check-in">
+            {qty} buc
+          </span>
+        )}
+      </button>
+      <div className="flex flex-1 flex-col gap-2.5 p-3">
+        <div className="flex-1">
+          <p className="break-words text-[13px] font-semibold leading-snug">{label}</p>
+          <p className="mt-0.5 text-xs text-muted">{price > 0 ? `${price} MDL/buc` : "Fără preț în catalog"}</p>
+        </div>
+        {active ? (
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => onQty(qty - 1)} title="O bucată mai puțin" className={stepBtn}>
               <Minus className="h-3.5 w-3.5" />
             </button>
-            <button
-              onClick={() => onQty(qty + 1)}
-              className="grid h-7 w-7 place-items-center rounded-md border border-border transition-colors hover:border-primary cursor-pointer"
-            >
+            <span className="min-w-6 flex-1 text-center text-[13px] font-semibold tabular-nums">{qty}</span>
+            <button type="button" onClick={() => onQty(qty + 1)} title="Încă o bucată" className={stepBtn}>
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={onRemove}
-              className="grid h-7 w-7 place-items-center rounded-md text-danger transition-colors hover:bg-danger/10 cursor-pointer"
+              type="button"
+              onClick={() => onQty(0)}
+              title="Scoate din estimare"
+              className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-danger transition-[background-color,transform] duration-150 hover:bg-danger/10 active:scale-90"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
-          </>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onQty(1)}
+            className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 rounded-md border border-border-strong/70 bg-card text-[13px] font-medium shadow-xs transition-[border-color,background-color,transform] duration-150 hover:border-foreground/40 hover:bg-subtle active:scale-[0.98]"
+          >
+            <Plus className="h-3.5 w-3.5" /> Adaugă
+          </button>
         )}
       </div>
     </div>
@@ -1031,35 +994,32 @@ function MechanismStep({
   const keys = Object.keys(catalog.mechanisms[brand]).filter((k) =>
     includePiston ? true : k !== "piston_gaz"
   );
+  const same = (m: QuoteConfig["mechanisms"][number], key: string) => m.brand === brand && m.key === key;
   return (
-    <div className="space-y-2">
+    <OptionGrid>
       {keys.map((key) => {
-        const line = config.mechanisms.find((m) => m.brand === brand && m.key === key);
+        const qty = config.mechanisms.find((m) => same(m, key))?.qty ?? 0;
         return (
-          <MechRow
+          <OptionCard
             key={key}
             label={MECHANISM_LABELS[key] ?? key}
             price={catalog.mechanisms[brand][key] ?? 0}
-            qty={line?.qty ?? 0}
-            onAdd={() =>
-              onChange([...config.mechanisms, { brand, key, qty: 1 }])
-            }
+            photo={MECHANISM_PHOTOS[key]}
+            pictogram={key}
+            qty={qty}
             onQty={(q) =>
               onChange(
                 q <= 0
-                  ? config.mechanisms.filter((m) => !(m.brand === brand && m.key === key))
-                  : config.mechanisms.map((m) =>
-                      m.brand === brand && m.key === key ? { ...m, qty: q } : m
-                    )
+                  ? config.mechanisms.filter((m) => !same(m, key))
+                  : qty === 0
+                    ? [...config.mechanisms, { brand, key, qty: q }]
+                    : config.mechanisms.map((m) => (same(m, key) ? { ...m, qty: q } : m))
               )
-            }
-            onRemove={() =>
-              onChange(config.mechanisms.filter((m) => !(m.brand === brand && m.key === key)))
             }
           />
         );
       })}
-    </div>
+    </OptionGrid>
   );
 }
 

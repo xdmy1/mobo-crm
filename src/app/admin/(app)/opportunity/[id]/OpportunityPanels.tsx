@@ -280,7 +280,7 @@ export function OpportunityPanels({
           }
         >
           <SimpleTable
-            head={["Titlu", "Mesaj", "Data creării", "Autor"]}
+            head={["Titlu", "Mesaj", "Data creării", "Autor", "Către", "Citit"]}
             rows={noteRows}
             onDelete={(row) => setDel({ entity: "note", row })}
           />
@@ -291,7 +291,7 @@ export function OpportunityPanels({
                   <Field label="Titlu" required>
                     <Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />
                   </Field>
-                  <Field label="Destinatarul notiței" help="Opțional — cine primește notificarea">
+                  <Field label="Către" help="Primește notificare și mesajul îi rămâne pe ecran până confirmă că l-a citit">
                     <Select value={noteRecipient} onChange={setNoteRecipient} options={options.staff} />
                   </Field>
                 </div>

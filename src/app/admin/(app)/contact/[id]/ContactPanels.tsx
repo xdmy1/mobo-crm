@@ -358,7 +358,7 @@ export function ContactPanels({
         }
       >
         <SimpleTable
-          head={["Titlu", "Mesaj", "Data creării", "Autor"]}
+          head={["Titlu", "Mesaj", "Data creării", "Autor", "Către", "Citit"]}
           rows={noteRows}
           onDelete={(r) => setDeleteNote(r)}
         />
@@ -372,8 +372,8 @@ export function ContactPanels({
               <Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />
             </Field>
             <Field
-              label="Destinatarul notiței"
-              help="Opțional — utilizatorul care primește notificarea"
+              label="Către"
+              help="Primește notificare și mesajul îi rămâne pe ecran până confirmă că l-a citit"
             >
               <Select value={noteRecipient} onChange={setNoteRecipient} options={staff} />
             </Field>

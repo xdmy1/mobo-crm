@@ -3,7 +3,7 @@
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
-import { mkdir, writeFile } from "fs/promises";
+import { putFile } from "@/lib/storage";
 
 const FONT_DIR = path.join(
   process.cwd(),
@@ -11,8 +11,6 @@ const FONT_DIR = path.join(
   "dejavu-fonts-ttf",
   "ttf"
 );
-
-export const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || "./uploads");
 
 export function newDoc(): PDFKit.PDFDocument {
   const doc = new PDFDocument({ size: "A4", margin: 50, bufferPages: true });
@@ -36,9 +34,8 @@ export async function saveDocFile(
   buffer: Buffer,
   fileName: string
 ): Promise<string> {
-  await mkdir(UPLOADS_DIR, { recursive: true });
   const stored = `${crypto.randomUUID()}__${fileName}`;
-  await writeFile(path.join(UPLOADS_DIR, stored), buffer);
+  await putFile(stored, buffer);
   return stored;
 }
 

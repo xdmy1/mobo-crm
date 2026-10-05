@@ -724,6 +724,7 @@ export async function getList(
           { key: "title", label: "Titlu", sortable: true },
           { key: "author", label: "Autor" },
           { key: "recipient", label: "Destinatar" },
+          { key: "read", label: "Citit" },
           { key: "company", label: "Persoană juridică" },
           { key: "contact", label: "Client" },
           { key: "opportunity", label: "Proiect" },
@@ -736,6 +737,11 @@ export async function getList(
             title: n.title,
             author: fullName(n.author),
             recipient: fullName(n.recipient),
+            read: n.recipientId
+              ? n.readAt
+                ? { t: `Citit ${fmtDateTime(n.readAt)}`, badge: "green" }
+                : { t: "Necitit", badge: "amber" }
+              : null,
             company: n.company?.name ?? null,
             contact: contactCell(n.contact),
             opportunity: opportunityCell(n.opportunity),

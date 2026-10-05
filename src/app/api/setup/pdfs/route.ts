@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { getCurrentUser, can } from "@/lib/auth";
+import { putFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
-const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || "./uploads");
 const SLOTS = new Set([
   "presentation-ro.pdf",
   "presentation-ru.pdf",
@@ -26,7 +24,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cerere invalidă" }, { status: 400 });
 
   const buf = Buffer.from(await file.arrayBuffer());
-  await mkdir(UPLOADS_DIR, { recursive: true });
-  await writeFile(path.join(UPLOADS_DIR, slot), buf);
+  await putFile(slot, buf, "application/pdf");
   return NextResponse.json({ ok: true });
 }

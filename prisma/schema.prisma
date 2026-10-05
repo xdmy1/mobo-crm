@@ -179,6 +179,8 @@ model Contact {
   presentCountry       String?
   nextAction           String?
   nextActionDate       DateTime?
+  /// comentariul vizibil sus în fișa clientului
+  comment              String?
   staffId              Int?
   staff                Staff?              @relation("ContactResponsible", fields: [staffId], references: [id])
   companyId            Int?
@@ -591,6 +593,8 @@ model Note {
   quote         Quote?       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   taskId        Int?
   task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// când a confirmat destinatarul că a citit mesajul (null = necitit)
+  readAt        DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -836,6 +840,16 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  createdAt DateTime @default(now())
+}
+
+// Conținutul fișierelor generate și încărcate (PDF, DOCX, PPTX, imagini) — vezi src/lib/storage.ts.
+// `key` = calea salvată pe înregistrări (Attachment.filePath, Offer.filePath…), ex. „<uuid>__nume.pdf”.
+model StoredFile {
+  key       String   @id
+  data      Bytes
+  mime      String?
+  size      Int
   createdAt DateTime @default(now())
 }
 

@@ -17,6 +17,7 @@ import {
   failureCauseOptions,
 } from "@/server/options";
 import { getDocOptions } from "@/server/docOptions";
+import { noteReadCell } from "@/lib/messages";
 import {
   ContractCreateButton,
   HandoverCreateButton,
@@ -121,6 +122,8 @@ export default async function ContactDetailPage({
       { text: n.body ?? EMPTY },
       { text: fmtDateTime(n.createdAt) },
       { text: personName(n.author) },
+      { text: personName(n.recipient) },
+      noteReadCell(n),
     ],
   }));
 
@@ -205,8 +208,7 @@ export default async function ContactDetailPage({
           lastName: contact.lastName,
           email: contact.email,
           phone: contact.phone,
-          nextAction: contact.nextAction,
-          nextActionDate: contact.nextActionDate?.toISOString() ?? null,
+          comment: contact.comment,
           idnp: contact.idnp,
           birthDate: contact.birthDate?.toISOString() ?? null,
           deliveryAddress: contact.deliveryAddress,

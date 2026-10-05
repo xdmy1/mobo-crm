@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { notify } from "@/lib/notify";
+import { notifyNewMessage } from "@/lib/messages";
 import { generateHumanId } from "@/lib/humanId";
 import bcrypt from "bcryptjs";
 
@@ -194,6 +195,7 @@ export const REGISTRY: Record<string, EntityConfig> = {
       productionSequenceId: "int",
       nextAction: "string",
       nextActionDate: "date",
+      comment: "string",
     },
     beforeSave: async (values, _userId, isCreate) => {
       // aceeași formă de telefon ca la lead-urile de pe site → deduplicarea prinde și „069…” vs „+373 69…”
@@ -300,15 +302,8 @@ export const REGISTRY: Record<string, EntityConfig> = {
       if (isCreate) values.authorId = userId;
       return values;
     },
-    afterSave: async (id, values, userId, isCreate) => {
-      if (isCreate && values.recipientId && Number(values.recipientId) !== userId) {
-        const author = await prisma.staff.findUnique({ where: { id: userId } });
-        await notify(
-          Number(values.recipientId),
-          `Mesaj nou de la ${author?.firstName ?? ""} ${author?.lastName ?? ""}: „${values.title}”`,
-          "/admin/note"
-        );
-      }
+    afterSave: async (id, _values, _userId, isCreate) => {
+      if (isCreate) await notifyNewMessage(id);
     },
   },
   attachment: {
