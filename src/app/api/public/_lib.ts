@@ -93,7 +93,7 @@ async function notifySales(text: string, link: string, alsoStaffId?: number | nu
   for (const id of targets) await notify(id, text, link);
 }
 
-/** Creează Client (Lead, Site Web) + Cameră Default + Proiect + Estimare goală.
+/** Creează Client (Lead, sursa „Site”) + Cameră Default + Proiect + Estimare goală.
  *  Deduplicare după telefon: dacă există, returnează clientul existent. */
 export async function createLeadPipeline(
   input: PublicLeadInput,
@@ -142,7 +142,8 @@ export async function createLeadPipeline(
 
   const [stage, source, roomType] = await Promise.all([
     prisma.contactStage.findFirst({ where: { name: "Lead" } }),
-    prisma.contactSource.findFirst({ where: { name: "Site Web" } }),
+    // „Site Web” = numele vechi, dinainte de lista nouă de surse (06.10.2026)
+    prisma.contactSource.findFirst({ where: { name: { in: ["Site", "Site Web"] } }, orderBy: { order: "asc" } }),
     roomTypeFor(input.room),
   ]);
 

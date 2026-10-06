@@ -72,6 +72,10 @@ export interface FormFieldDef {
   accept?: string;
   multiple?: boolean;
   section?: string; // subtitlu de grup, ex. „Rechizite bancare:”
+  /** câmpul apare (și se validează / se trimite) doar când alt câmp are valoarea dată */
+  showIf?: { field: string; equals: string };
+  /** sugestii de completare pentru câmpurile text (ex. companiile existente) */
+  suggestions?: string[];
 }
 
 export interface FormConfig {

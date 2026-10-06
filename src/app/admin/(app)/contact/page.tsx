@@ -9,6 +9,7 @@ import {
 import { getDocOptions } from "@/server/docOptions";
 import { ListShell } from "@/components/table/ListShell";
 import { ContractCreateButton } from "@/components/documents/ContractCreateButton";
+import { clientTypeFields } from "@/lib/forms/clientType";
 import type { FormConfig } from "@/lib/listTypes";
 
 export const metadata = { title: "Persoane Fizice — MOBO CRM" };
@@ -36,6 +37,7 @@ export default async function ContactsPage({
     smartPaste: true,
     dedupePhoneField: "phone",
     fields: [
+      ...clientTypeFields(companies.map((c) => c.label)),
       { name: "firstName", label: "Prenume", type: "text", required: true, placeholder: "Ion" },
       { name: "lastName", label: "Nume", type: "text", required: true, placeholder: "Popescu" },
       { name: "phone", label: "Număr de contact", type: "text", placeholder: "+373 69 000 000" },
@@ -56,7 +58,6 @@ export default async function ContactsPage({
         defaultValue: stages.find((s) => s.label === "Lead")?.value,
       },
       { name: "sourceId", label: "Sursă", type: "select", options: sources },
-      { name: "companyId", label: "Persoană juridică", type: "select", options: companies },
       {
         name: "comment",
         label: "Comentariu",

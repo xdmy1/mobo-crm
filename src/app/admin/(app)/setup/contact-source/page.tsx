@@ -19,6 +19,7 @@ export default async function Page({
       fields={[
       { name: "name", label: "Nume", type: "text", required: true },
       { name: "code", label: "Cod ID (2 cifre)", type: "text", required: true, placeholder: "01", help: "Primele 2 cifre din ID-ul uman al clientului" },
+      { name: "order", label: "Ordine", type: "number", placeholder: "la final", help: "Poziția în lista de surse (1 = prima)" },
     ]}
       searchParams={await searchParams}
     />

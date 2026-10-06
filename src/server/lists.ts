@@ -100,15 +100,17 @@ const NOMEN: Record<string, NomenSpec> = {
   productCategory: nameSpec("productCategory"),
   contactSource: {
     model: "contactSource",
+    orderBy: [{ order: "asc" }, { id: "asc" }],
     columns: [
       { key: "name", label: "Nume", sortable: true },
+      { key: "order", label: "Ordine" },
       { key: "code", label: "Cod ID" },
       { key: "createdAt", label: "Data creării" },
       { key: "updatedAt", label: "Data actualizării" },
     ],
     map: (r) => ({
-      cells: { name: r.name, code: r.code, ...dates(r) },
-      raw: { name: r.name, code: r.code },
+      cells: { name: r.name, order: r.order, code: r.code, ...dates(r) },
+      raw: { name: r.name, order: r.order, code: r.code },
     }),
   },
   contactStage: {

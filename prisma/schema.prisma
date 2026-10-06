@@ -143,6 +143,7 @@ model ContactSource {
   id        Int       @id @default(autoincrement())
   name      String
   code      String    @default("00") // primele 2 cifre din ID-ul uman
+  order     Int       @default(0) // ordinea în liste
   contacts  Contact[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

@@ -199,20 +199,20 @@ async function main() {
       });
   }
 
-  // ── Surse client (cu cod pentru ID-ul uman) ──
+  // ── Surse client (cu cod pentru ID-ul uman), în ordinea din liste ──
+  // codurile 05 (Tik-tok) și 08 (Recomandare Internă) au fost retrase pe 06.10.2026 — nu le refolosi
   const sources: Array<[string, string]> = [
-    ["Site Web", "01"],
+    ["Site", "01"],
     ["Apel direct", "02"],
+    ["Showroom", "09"],
     ["Instagram", "03"],
     ["Facebook", "04"],
-    ["Tik-tok", "05"],
-    ["Recomandare client", "06"],
-    ["Recomandare partener", "07"],
-    ["Recomandare Internă", "08"],
+    ["Partener", "07"],
+    ["Recomandare", "06"],
   ];
-  for (const [name, code] of sources) {
+  for (const [i, [name, code]] of sources.entries()) {
     const existing = await prisma.contactSource.findFirst({ where: { name } });
-    if (!existing) await prisma.contactSource.create({ data: { name, code } });
+    if (!existing) await prisma.contactSource.create({ data: { name, code, order: i + 1 } });
   }
 
   // ── Cauzele eșecului ──
@@ -428,10 +428,10 @@ async function main() {
     (await prisma.opportunityStage.findFirst({ where: { name } }))!.id;
 
   const demoContacts = [
-    { first: "Mobo", last: "Kitchens", phone: "+37369556615", email: "client1@mail.md", stage: "Lead", source: "Site Web" },
+    { first: "Mobo", last: "Kitchens", phone: "+37369556615", email: "client1@mail.md", stage: "Lead", source: "Site" },
     { first: "Dorin", last: "Testescu", phone: "+37369111222", email: "dorin@mail.md", stage: "Prezentare", source: "Instagram" },
     { first: "Ana", last: "Popescu", phone: "+37378333444", email: "ana.popescu@mail.md", stage: "Măsurare", source: "Facebook" },
-    { first: "Ion", last: "Rusu", phone: "+37360555666", email: "ion.rusu@mail.md", stage: "Contractat", source: "Recomandare client" },
+    { first: "Ion", last: "Rusu", phone: "+37360555666", email: "ion.rusu@mail.md", stage: "Contractat", source: "Recomandare" },
     { first: "Stoian", last: "Iurii", phone: "+37369777888", email: "stoian@mail.md", stage: "Predat Producere", source: "Apel direct" },
   ];
 

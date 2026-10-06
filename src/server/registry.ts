@@ -53,7 +53,17 @@ export const REGISTRY: Record<string, EntityConfig> = {
   contactSource: {
     model: "contactSource",
     module: "setup",
-    fields: { name: "string", code: "string" },
+    fields: { name: "string", code: "string", order: "int" },
+    beforeSave: async (values, _userId, isCreate) => {
+      // o sursă nouă fără ordine merge la coada listei; la editare, o ordine ștearsă rămâne cum era
+      if (values.order === null || values.order === undefined) {
+        if (isCreate) {
+          const last = await prisma.contactSource.aggregate({ _max: { order: true } });
+          values.order = (last._max.order ?? 0) + 1;
+        } else delete values.order;
+      }
+      return values;
+    },
   },
   failureCause: simple("failureCause"),
   productionSequence: simple("productionSequence"),
@@ -212,6 +222,20 @@ export const REGISTRY: Record<string, EntityConfig> = {
               `Există deja un client cu acest telefon: ${dup.firstName} ${dup.lastName} (${dup.humanId})`
             );
           }
+        }
+        // persoană juridică: se leagă de compania cu același nume sau se creează una nouă
+        const companyName = String(values.companyName ?? "").trim();
+        if (values.clientType === "juridica" && companyName) {
+          const idno = String(values.companyIdno ?? "").trim() || null;
+          const existing = await prisma.company.findFirst({
+            where: { name: { equals: companyName, mode: "insensitive" } },
+          });
+          const company = existing
+            ? existing.idno || !idno
+              ? existing
+              : await prisma.company.update({ where: { id: existing.id }, data: { idno } })
+            : await prisma.company.create({ data: { name: companyName, idno } });
+          values.companyId = company.id;
         }
         const sourceId = values.sourceId ? Number(values.sourceId) : null;
         values.humanId = await generateHumanId(sourceId);

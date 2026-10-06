@@ -32,6 +32,8 @@ import {
   removeOpportunityFromBoard,
 } from "@/server/actions/stages";
 import { deleteRecords, saveRecord } from "@/server/actions/crud";
+import { FieldRenderer } from "@/components/form/FormDrawer";
+import { clientTypeFields } from "@/lib/forms/clientType";
 import type { BadgeColor, SelectOption } from "@/lib/listTypes";
 
 export interface KanbanCard {
@@ -67,6 +69,7 @@ export function KanbanBoard({
   failureCauses = [],
   staffOptions = [],
   leadStageId,
+  companyNames = [],
 }: {
   board: "sales" | "production";
   columns: KanbanColumn[];
@@ -74,6 +77,8 @@ export function KanbanBoard({
   failureCauses?: SelectOption[];
   staffOptions?: SelectOption[];
   leadStageId?: number;
+  /** sugestii pentru „Denumirea companiei” la un lead persoană juridică */
+  companyNames?: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -470,6 +475,7 @@ export function KanbanBoard({
           staffOptions={staffOptions}
           stageOptions={columns.map((c) => ({ value: String(c.id), label: c.name }))}
           leadStageId={leadStageId}
+          companyNames={companyNames}
         />
       )}
     </div>
@@ -482,15 +488,21 @@ function AddClientModal({
   staffOptions,
   stageOptions,
   leadStageId,
+  companyNames,
 }: {
   open: boolean;
   onClose: () => void;
   staffOptions: SelectOption[];
   stageOptions: SelectOption[];
   leadStageId?: number;
+  companyNames: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
+  const [typeField, companyField, idnoField] = useMemo(() => clientTypeFields(companyNames), [companyNames]);
+  const [clientType, setClientType] = useState("fizica");
+  const [companyName, setCompanyName] = useState("");
+  const [companyIdno, setCompanyIdno] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -502,12 +514,19 @@ function AddClientModal({
   const [loading, setLoading] = useState(false);
 
   async function submit() {
+    const juridica = clientType === "juridica";
+    if (juridica && !companyName.trim()) {
+      setErr("Completează denumirea companiei.");
+      return;
+    }
     if (!firstName.trim() || !lastName.trim()) {
       setErr("Prenumele și numele sunt obligatorii.");
       return;
     }
     setLoading(true);
     const res = await saveRecord("contact", null, {
+      clientType,
+      ...(juridica ? { companyName, companyIdno } : {}),
       firstName,
       lastName,
       phone,
@@ -520,6 +539,9 @@ function AddClientModal({
       return;
     }
     toast.success("Client creat");
+    setClientType("fizica");
+    setCompanyName("");
+    setCompanyIdno("");
     setFirstName("");
     setLastName("");
     setPhone("");
@@ -546,6 +568,13 @@ function AddClientModal({
       }
     >
       <div className="space-y-3.5">
+        <FieldRenderer def={typeField} value={clientType} onChange={(v) => setClientType(String(v))} />
+        {clientType === "juridica" && (
+          <div className="space-y-3.5 animate-rise-in">
+            <FieldRenderer def={companyField} value={companyName} onChange={(v) => setCompanyName(String(v))} />
+            <FieldRenderer def={idnoField} value={companyIdno} onChange={(v) => setCompanyIdno(String(v))} />
+          </div>
+        )}
         <Field label="Prenume" required>
           <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ion" />
         </Field>

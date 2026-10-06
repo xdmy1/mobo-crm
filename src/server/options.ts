@@ -24,7 +24,7 @@ export async function contactStageOptions(): Promise<SelectOption[]> {
 }
 
 export async function contactSourceOptions(): Promise<SelectOption[]> {
-  return toOpt(await prisma.contactSource.findMany({ orderBy: { id: "asc" } }));
+  return toOpt(await prisma.contactSource.findMany({ orderBy: [{ order: "asc" }, { id: "asc" }] }));
 }
 
 export async function failureCauseOptions(): Promise<SelectOption[]> {

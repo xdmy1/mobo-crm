@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SalesKanbanPage() {
   await requireUser();
-  const [stages, contacts, staff, causes] = await Promise.all([
+  const [stages, contacts, staff, causes, companies] = await Promise.all([
     prisma.contactStage.findMany({ orderBy: { order: "asc" } }),
     prisma.contact.findMany({
       where: { deletedAt: null, stageId: { not: null } },
@@ -20,6 +20,7 @@ export default async function SalesKanbanPage() {
     }),
     staffOptions(),
     failureCauseOptions(),
+    prisma.company.findMany({ orderBy: { name: "asc" }, select: { name: true } }),
   ]);
 
   const now = new Date();
@@ -50,6 +51,7 @@ export default async function SalesKanbanPage() {
       staffOptions={staff}
       failureCauses={causes}
       leadStageId={leadStage?.id}
+      companyNames={companies.map((c) => c.name)}
     />
   );
 }

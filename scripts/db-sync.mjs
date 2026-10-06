@@ -6,6 +6,7 @@
 // deployment-ul vechi rămâne activ.
 
 import { execSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 
 if (!process.env.VERCEL) process.exit(0);
 
@@ -21,6 +22,16 @@ const url =
 if (!url) {
   console.warn("db-sync: nicio conexiune la bază în variabilele de mediu — schema nu a fost sincronizată.");
   process.exit(0);
+}
+
+// migrări de date din scripts/sql (în ordinea numelui), ÎNAINTE de push; fiecare e idempotentă
+// și se păzește singură (ex. rulează doar dacă lipsește coloana pe care o adaugă)
+for (const file of readdirSync("scripts/sql").filter((f) => f.endsWith(".sql")).sort()) {
+  console.log(`db-sync: ${file}`);
+  execSync(`npx prisma db execute --url "$DATABASE_URL" --file scripts/sql/${file}`, {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: url },
+  });
 }
 
 execSync("npx prisma db push --skip-generate", {

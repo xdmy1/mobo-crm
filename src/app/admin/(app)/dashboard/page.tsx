@@ -169,6 +169,7 @@ export default async function DashboardPage({
       orderBy: { expirationDate: "asc" },
     }),
     prisma.contactSource.findMany({
+      orderBy: [{ order: "asc" }, { id: "asc" }],
       include: { _count: { select: { contacts: { where: { deletedAt: null } } } } },
     }),
   ]);

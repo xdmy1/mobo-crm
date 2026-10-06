@@ -4,8 +4,10 @@
 // Etapa NU se mai schimbă de aici — are un singur loc: bara de parcurs din capul fișei (StagePath).
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Building2,
   Check,
   ChevronDown,
   Mail,
@@ -43,8 +45,8 @@ interface ContactData {
   staffId: number | null;
   stageId: number | null;
   sourceId: number | null;
-  companyId: number | null;
-  productionSequenceId: number | null;
+  /** persoana juridică aleasă la adăugarea lead-ului (null = persoană fizică) */
+  company: { id: number; name: string } | null;
 }
 
 export function ContactSidebar({
@@ -57,8 +59,6 @@ export function ContactSidebar({
     staff: SelectOption[];
     stages: SelectOption[];
     sources: SelectOption[];
-    companies: SelectOption[];
-    prodSeq: SelectOption[];
     causes: SelectOption[];
   };
   canDelete: boolean;
@@ -98,6 +98,18 @@ export function ContactSidebar({
             {contact.firstName} {contact.lastName}
           </p>
           <p className="mt-0.5 font-mono text-[11px] text-muted">ID {contact.humanId}</p>
+          {contact.company ? (
+            <Link
+              href={`/admin/company/${contact.company.id}`}
+              title="Deschide fișa persoanei juridice"
+              className="mt-1 inline-flex max-w-full items-center gap-1 text-xs font-medium text-foreground/80 transition-colors hover:text-foreground"
+            >
+              <Building2 className="h-3 w-3 shrink-0 text-muted" />
+              <span className="truncate">{contact.company.name}</span>
+            </Link>
+          ) : (
+            <p className="mt-1 text-xs text-muted">Persoană fizică</p>
+          )}
         </div>
         <button
           onClick={() => setCollapsed(true)}
@@ -151,12 +163,6 @@ export function ContactSidebar({
         <InlineField label="Email" value={contact.email} onSave={(v) => saveField("email", v)} />
         <InlineField label="Număr de contact" value={contact.phone} onSave={(v) => saveField("phone", v)} />
         <InlineField label="IDNP" value={contact.idnp} onSave={(v) => saveField("idnp", v)} />
-        <SideSelect
-          label="Succesiune Producție"
-          value={contact.productionSequenceId}
-          options={options.prodSeq}
-          onChange={(v) => saveField("productionSequenceId", v)}
-        />
       </div>
 
       <div className="border-t border-border pt-4">
@@ -180,12 +186,6 @@ export function ContactSidebar({
                 className="h-8 text-[13px]"
               />
             </div>
-            <SideSelect
-              label="Persoană Juridică"
-              value={contact.companyId}
-              options={options.companies}
-              onChange={(v) => saveField("companyId", v)}
-            />
             <SideSelect
               label="Sursă"
               value={contact.sourceId}

@@ -119,6 +119,10 @@ export function FormDrawer({
       });
   };
 
+  // câmpurile condiționate (showIf) ascunse nu se validează și nu se trimit
+  const isShown = (f: FormFieldDef) =>
+    !f.showIf || String(values[f.showIf.field] ?? "") === f.showIf.equals;
+
   const dirty = files.length > 0 || JSON.stringify(values) !== pristine;
   const requestClose = () => {
     if (loading) return;
@@ -129,7 +133,7 @@ export function FormDrawer({
   async function submit() {
     const errs: Record<string, string> = {};
     for (const f of config.fields) {
-      if (!f.required) continue;
+      if (!f.required || !isShown(f)) continue;
       const v = values[f.name];
       const empty =
         v === "" ||
@@ -157,13 +161,15 @@ export function FormDrawer({
 
     setLoading(true);
     try {
-      let payloads: Values[] = [{ ...values, ...(extraValues ?? {}) }];
+      const hidden = new Set(config.fields.filter((f) => !isShown(f)).map((f) => f.name));
+      const sent = Object.fromEntries(Object.entries(values).filter(([k]) => !hidden.has(k)));
+      let payloads: Values[] = [{ ...sent, ...(extraValues ?? {}) }];
       // upload fișiere — un record per fișier
       const fileField = config.fields.find((f) => f.type === "file");
       if (fileField && files.length > 0) {
         const uploaded = await uploadFiles(files);
         payloads = uploaded.map((u) => ({
-          ...values,
+          ...sent,
           ...(extraValues ?? {}),
           filePath: u.path,
           mime: u.mime,
@@ -249,11 +255,13 @@ export function FormDrawer({
             />
           </div>
         )}
-        {config.fields.map((f) => (
+        {config.fields.filter(isShown).map((f) => (
           <div
             key={f.name}
             data-field={f.name}
-            className={flash.includes(f.name) ? "field-flash rounded-lg" : undefined}
+            className={
+              flash.includes(f.name) ? "field-flash rounded-lg" : f.showIf ? "animate-rise-in" : undefined
+            }
           >
             {f.section && (
               <p className="mb-3 mt-2 border-b border-border pb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
@@ -431,7 +439,16 @@ export function FieldRenderer({
             value={String(value ?? "")}
             placeholder={def.placeholder}
             onChange={(e) => onChange(e.target.value)}
+            list={def.suggestions?.length ? `suggest-${def.name}` : undefined}
+            autoComplete={def.suggestions?.length ? "off" : undefined}
           />
+          {def.suggestions?.length ? (
+            <datalist id={`suggest-${def.name}`}>
+              {def.suggestions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          ) : null}
         </Field>
       );
   }

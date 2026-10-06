@@ -11,8 +11,6 @@ import {
   staffOptions,
   contactStageOptions,
   contactSourceOptions,
-  companyOptions,
-  productionSequenceOptions,
   roomTypeOptions,
   failureCauseOptions,
 } from "@/server/options";
@@ -71,13 +69,11 @@ export default async function ContactDetailPage({
   });
   if (!contact) notFound();
 
-  const [staff, stages, sources, companies, prodSeq, roomTypes, causes, docOpts, stageRows] =
+  const [staff, stages, sources, roomTypes, causes, docOpts, stageRows] =
     await Promise.all([
       staffOptions(),
       contactStageOptions(),
       contactSourceOptions(),
-      companyOptions(),
-      productionSequenceOptions(),
       roomTypeOptions(),
       failureCauseOptions(),
       getDocOptions(contactId),
@@ -217,10 +213,9 @@ export default async function ContactDetailPage({
           staffId: contact.staffId,
           stageId: contact.stageId,
           sourceId: contact.sourceId,
-          companyId: contact.companyId,
-          productionSequenceId: contact.productionSequenceId,
+          company: contact.company ? { id: contact.company.id, name: contact.company.name } : null,
         }}
-        options={{ staff, stages, sources, companies, prodSeq, causes }}
+        options={{ staff, stages, sources, causes }}
         canDelete={user.isAdmin || user.permissions.has("delete-contact")}
       />
 
