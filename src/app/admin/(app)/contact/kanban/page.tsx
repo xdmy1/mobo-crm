@@ -28,7 +28,7 @@ export default async function SalesKanbanPage() {
     id: c.id,
     columnId: c.stageId!,
     title: personName(c),
-    humanId: c.humanId,
+    humanId: `#${c.humanId}`,
     datetime: fmtDateTime(c.createdAt),
     phone: c.phone ?? undefined,
     href: `/admin/contact/${c.id}`,

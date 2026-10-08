@@ -437,16 +437,12 @@ async function main() {
 
   const contactsExist = await prisma.contact.count();
   if (contactsExist === 0) {
-    let seq = 1;
     for (const d of demoContacts) {
       const sourceId = await srcByName(d.source);
-      const source = await prisma.contactSource.findUnique({ where: { id: sourceId } });
-      const now = new Date();
-      const humanId = `${source!.code}/${seq}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getFullYear()).slice(-2)}`;
+      // ID-ul vizibil (1, 2, 3…) îl dă baza, din secvență
       const stageId = await stageByName(d.stage);
       const contact = await prisma.contact.create({
         data: {
-          humanId,
           firstName: d.first,
           lastName: d.last,
           phone: d.phone,
@@ -457,7 +453,6 @@ async function main() {
           stageHistory: { create: { stageId } },
         },
       });
-      seq++;
 
       // camere + proiecte
       const defaultRoom = await prisma.room.create({

@@ -168,7 +168,7 @@ model ProductionSequence {
 
 model Contact {
   id                   Int                 @id @default(autoincrement())
-  humanId              String              @unique // ex. 01/209/09/26
+  humanId              Int                 @unique @default(autoincrement()) // ID-ul vizibil al clientului: 1, 2, 3… (numerele nu se refolosesc)
   firstName            String
   lastName             String
   email                String?
@@ -607,6 +607,7 @@ enum AttachmentType {
   CONTRACT
   OFERTA
   MASURARI
+  SPECIFICATII
 }
 
 model Attachment {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generateHumanId } from "@/lib/humanId";
 import { notify } from "@/lib/notify";
 import { personName } from "@/lib/people";
 import { normalizePhone } from "@/lib/phone";
@@ -132,7 +131,7 @@ export async function createLeadPipeline(
       await saveRequestNote(existing.id, opportunity.id, input, `${projectName} (client existent)`);
       // un client existent care revine pe site e un semnal cald — înainte nu afla nimeni
       await notifySales(
-        `Clientul ${personName(existing)} (${existing.humanId}) a trimis o cerere nouă de pe site: „${projectName}”.`,
+        `Clientul ${personName(existing)} (#${existing.humanId}) a trimis o cerere nouă de pe site: „${projectName}”.`,
         `/admin/contact/${existing.id}`,
         existing.staffId
       );
@@ -147,10 +146,8 @@ export async function createLeadPipeline(
     roomTypeFor(input.room),
   ]);
 
-  const humanId = await generateHumanId(source?.id);
   const contact = await prisma.contact.create({
     data: {
-      humanId,
       firstName: input.firstName?.trim() || "Client",
       lastName: input.lastName?.trim() || "Site",
       phone: phone || null,

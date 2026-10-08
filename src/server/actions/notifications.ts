@@ -68,7 +68,7 @@ export async function globalSearch(q: string) {
           { firstName: { contains: term, mode: "insensitive" } },
           { lastName: { contains: term, mode: "insensitive" } },
           { phone: { contains: term } },
-          { humanId: { contains: term } },
+          ...(/^#?\d+$/.test(term) ? [{ humanId: Number(term.replace("#", "")) }] : []),
           { email: { contains: term, mode: "insensitive" } },
         ],
       },
@@ -93,7 +93,7 @@ export async function globalSearch(q: string) {
     ...contacts.map((c) => ({
       kind: "Client",
       label: personName(c),
-      sub: `${c.humanId}${c.phone ? " · " + c.phone : ""}`,
+      sub: `#${c.humanId}${c.phone ? " · " + c.phone : ""}`,
       href: `/admin/contact/${c.id}`,
     })),
     ...opportunities.map((o) => ({

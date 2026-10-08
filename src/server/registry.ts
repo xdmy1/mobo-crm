@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { notify } from "@/lib/notify";
 import { notifyNewMessage } from "@/lib/messages";
-import { generateHumanId } from "@/lib/humanId";
 import bcrypt from "bcryptjs";
 
 export type FieldKind = "string" | "number" | "int" | "date" | "bool" | "stringArray";
@@ -219,7 +218,7 @@ export const REGISTRY: Record<string, EntityConfig> = {
           });
           if (dup) {
             throw new Error(
-              `Există deja un client cu acest telefon: ${dup.firstName} ${dup.lastName} (${dup.humanId})`
+              `Există deja un client cu acest telefon: ${dup.firstName} ${dup.lastName} (#${dup.humanId})`
             );
           }
         }
@@ -237,8 +236,6 @@ export const REGISTRY: Record<string, EntityConfig> = {
             : await prisma.company.create({ data: { name: companyName, idno } });
           values.companyId = company.id;
         }
-        const sourceId = values.sourceId ? Number(values.sourceId) : null;
-        values.humanId = await generateHumanId(sourceId);
         if (!values.stageId) {
           const lead = await prisma.contactStage.findFirst({ where: { name: "Lead" } });
           if (lead) values.stageId = lead.id;

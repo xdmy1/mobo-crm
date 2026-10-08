@@ -1,8 +1,8 @@
 "use client";
 
-// Panourile colapsabile din pagina clientului: Camere, Proiecte, Contracte, Oferte, Mesaje + Timeline [NOU].
+// Panourile colapsabile din pagina clientului: Camere (cu proiectele înăuntru), Contracte, Oferte, Mesaje + Istoric.
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,13 +10,13 @@ import {
   Download,
   FileSignature,
   FileText,
-  FolderKanban,
   History,
   Mail,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { Collapse, Empty, Badge } from "@/components/ui/Misc";
 import { ConfirmDialog, Drawer, Modal } from "@/components/ui/Overlay";
@@ -46,6 +46,57 @@ export interface TimelineItem {
   whenText: string;
   kind: string;
   text: string;
+}
+
+/** un proiect, așa cum apare sub camera lui: etapa, valoarea și câte fișiere 2D / 3D / specificații are */
+export interface ProjectItem {
+  id: number;
+  name: string;
+  stage: { text: string; badge: BadgeColor } | null;
+  valueText: string;
+  /** suma în lei, sub cea în euro */
+  valueSubText: string | null;
+  deadlineText: string;
+  files: { d2: number; d3: number; spec: number };
+}
+
+/** o cameră a clientului, cu proiectele ei înăuntru */
+export interface RoomItem {
+  id: number;
+  name: string;
+  roomTypeId: string | null;
+  sumText: string | null;
+  createdText: string;
+  projects: ProjectItem[];
+}
+
+const FILE_KINDS: Array<{ key: keyof ProjectItem["files"]; label: string }> = [
+  { key: "d2", label: "2D" },
+  { key: "d3", label: "3D" },
+  { key: "spec", label: "Specificații" },
+];
+
+/** „2D 1 · 3D 0 · Specificații 2” — ce are proiectul încărcat; ce lipsește rămâne estompat */
+function FileChips({ files, href }: { files: ProjectItem["files"]; href: string }) {
+  return (
+    <span className="flex items-center gap-0.5 whitespace-nowrap">
+      {FILE_KINDS.map(({ key, label }) => (
+        <Link
+          key={key}
+          href={href}
+          title={files[key] > 0 ? `${label}: ${files[key]} fișiere — deschide proiectul` : `${label}: nimic încărcat încă`}
+          className={cn(
+            "whitespace-nowrap rounded-md px-1 py-0.5 text-[11px] font-medium tabular-nums transition-colors",
+            files[key] > 0
+              ? "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.1]"
+              : "text-muted/60 hover:text-muted"
+          )}
+        >
+          {label} {files[key]}
+        </Link>
+      ))}
+    </span>
+  );
 }
 
 const TIMELINE_COLORS: Record<string, BadgeColor> = {
@@ -145,8 +196,8 @@ export function SimpleTable({
 export function ContactPanels({
   contactId,
   contactName,
-  roomRows,
-  projectRows = [],
+  rooms,
+  orphanProjects = [],
   offerRows = [],
   contractRows,
   noteRows,
@@ -162,9 +213,11 @@ export function ContactPanels({
   defaultRecipientId?: string | null;
   /** tipurile de cameră pe care clientul le are deja — prima e propusă la „Proiect nou” */
   roomTypeIds?: number[];
-  projectRows?: PanelRow[];
+  /** camerele clientului, fiecare cu proiectele ei */
+  rooms: RoomItem[];
+  /** proiecte fără cameră — apar în același panou, la coadă */
+  orphanProjects?: ProjectItem[];
   offerRows?: PanelRow[];
-  roomRows: PanelRow[];
   contractRows: PanelRow[];
   noteRows: PanelRow[];
   timeline: TimelineItem[];
@@ -180,7 +233,8 @@ export function ContactPanels({
   const [roomDrawer, setRoomDrawer] = useState<{ id: number | null } | null>(null);
   const [roomTypeId, setRoomTypeId] = useState<string | null>(null);
   const [roomSaving, setRoomSaving] = useState(false);
-  const [deleteRoom, setDeleteRoom] = useState<PanelRow | null>(null);
+  const [deleteRoom, setDeleteRoom] = useState<RoomItem | null>(null);
+  const [deleteProject, setDeleteProject] = useState<ProjectItem | null>(null);
 
   // Contracte
   const [deleteContractRow, setDeleteContractRow] = useState<PanelRow | null>(null);
@@ -188,22 +242,32 @@ export function ContactPanels({
   // Mesaje
   // Proiect nou dintr-un pas
   const [projectOpen, setProjectOpen] = useState(false);
+  /** camera din al cărei rând s-a apăsat „Proiect” — atunci nu se mai alege nimic, doar numele */
+  const [projectTarget, setProjectTarget] = useState<RoomItem | null>(null);
   const [projectRoom, setProjectRoom] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectSaving, setProjectSaving] = useState(false);
   const lastName = contactName.split(/\s+/).slice(1).join(" ") || contactName;
-  const suggestedName = (roomTypeId: string | null) => {
-    const label = roomTypes.find((r) => r.value === roomTypeId)?.label.replace(/^Cameră\s+/i, "");
+  const nameFromRoom = (roomName: string | undefined) => {
+    const label = roomName?.replace(/^Cameră\s+/i, "");
     return label && label !== "Default" ? `${label} ${lastName}` : `Proiect ${lastName}`;
+  };
+  const suggestedName = () =>
+    nameFromRoom(projectTarget ? projectTarget.name : roomTypes.find((r) => r.value === projectRoom)?.label);
+  const openProject = (room: RoomItem | null) => {
+    setProjectTarget(room);
+    setProjectRoom(room ? null : roomTypeIds[0] != null ? String(roomTypeIds[0]) : null);
+    setProjectName("");
+    setProjectOpen(true);
   };
 
   async function createProject() {
-    if (!projectRoom) return toast.error("Alege camera.");
+    if (!projectTarget && !projectRoom) return toast.error("Alege camera.");
     setProjectSaving(true);
     const res = await quickProject({
       contactId,
-      roomTypeId: parseInt(projectRoom, 10),
-      name: projectName || suggestedName(projectRoom),
+      ...(projectTarget ? { roomId: projectTarget.id } : { roomTypeId: parseInt(projectRoom!, 10) }),
+      name: projectName || suggestedName(),
     });
     setProjectSaving(false);
     if (!res.ok) return toast.error(res.error ?? "Eroare");
@@ -263,56 +327,76 @@ export function ContactPanels({
         title="Camere"
         icon={<DoorOpen className="h-4 w-4 text-muted" />}
         defaultOpen
-        count={roomRows.length}
+        count={rooms.length}
         extra={
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setRoomTypeId(null);
-              setRoomDrawer({ id: null });
-            }}
-          >
-            <Plus className="h-4 w-4" /> Adaugă Acum
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              title="O cameră goală, fără proiect (pentru oferte sau fișiere)"
+              onClick={() => {
+                setRoomTypeId(null);
+                setRoomDrawer({ id: null });
+              }}
+            >
+              <Plus className="h-4 w-4" /> Cameră
+            </Button>
+            <Button
+              size="sm"
+              variant={rooms.length === 0 ? "create" : "outline"}
+              title="Creează camera (dacă lipsește) și proiectul dintr-un singur pas, apoi te duce direct la estimare"
+              onClick={() => openProject(null)}
+            >
+              <Plus className="h-4 w-4" /> Proiect nou
+            </Button>
+          </div>
         }
       >
-        <SimpleTable
-          head={["Nume cameră", "Sumă", "Data creării", "Data actualizării"]}
-          rows={roomRows}
-          onEdit={(r) => {
-            setRoomTypeId((r.raw?.roomTypeId as string) ?? null);
-            setRoomDrawer({ id: r.id });
-          }}
-          onDelete={(r) => setDeleteRoom(r)}
-        />
-      </Collapse>
-
-      <Collapse
-        title="Proiecte"
-        icon={<FolderKanban className="h-4 w-4 text-muted" />}
-        defaultOpen
-        count={projectRows.length}
-        extra={
-          <Button
-            size="sm"
-            variant="outline"
-            title="Creează camera (dacă lipsește) și proiectul dintr-un singur pas, apoi te duce direct la estimare"
-            onClick={() => {
-              const first = roomTypeIds[0] != null ? String(roomTypeIds[0]) : null;
-              setProjectRoom(first);
-              setProjectName("");
-              setProjectOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Proiect nou
-          </Button>
-        }
-      >
-        {projectRows.length === 0 ? (
-          <Empty compact text="Niciun proiect încă — „Proiect nou” creează camera și proiectul dintr-un pas" />
+        {rooms.length === 0 && orphanProjects.length === 0 ? (
+          <Empty compact text="Nicio cameră încă — „Proiect nou” creează camera și proiectul dintr-un pas" />
         ) : (
-          <SimpleTable head={["Proiect", "Cameră", "Etapa de producție", "Valoare", "Deadline"]} rows={projectRows} />
+          <div className="-mx-4 -my-4 overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-border bg-subtle/60 text-left text-xs text-muted">
+                  {["Proiect", "Etapa de producție", "Valoare", "Deadline", "Fișiere"].map((h, i) => (
+                    <th key={h} className={cn("whitespace-nowrap px-3 py-2 font-medium", i === 0 && "w-full pl-4")}>
+                      {h}
+                    </th>
+                  ))}
+                  <th className="w-px px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {rooms.map((room) => (
+                  <RoomGroup
+                    key={room.id}
+                    room={room}
+                    onProject={() => openProject(room)}
+                    onEdit={() => {
+                      setRoomTypeId(room.roomTypeId);
+                      setRoomDrawer({ id: room.id });
+                    }}
+                    onDelete={() => setDeleteRoom(room)}
+                    onDeleteProject={setDeleteProject}
+                  />
+                ))}
+                {orphanProjects.length > 0 && (
+                  <RoomGroup
+                    room={{
+                      id: 0,
+                      name: "Fără cameră",
+                      roomTypeId: null,
+                      sumText: null,
+                      createdText: "",
+                      projects: orphanProjects,
+                    }}
+                    onDeleteProject={setDeleteProject}
+                  />
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </Collapse>
 
@@ -470,21 +554,28 @@ export function ContactPanels({
         }
       >
         <div className="space-y-4">
-          <Field label="Cameră" required help="Dacă clientul nu are încă această cameră, o creez eu">
-            <Select
-              value={projectRoom}
-              onChange={setProjectRoom}
-              options={roomTypes}
-              placeholder="Selectează camera"
-              allowClear={false}
-            />
-          </Field>
+          {projectTarget ? (
+            <Field label="Cameră" help="Proiectul intră în această cameră">
+              <Input value={projectTarget.name} disabled />
+            </Field>
+          ) : (
+            <Field label="Cameră" required help="Dacă clientul nu are încă această cameră, o creez eu">
+              <Select
+                value={projectRoom}
+                onChange={setProjectRoom}
+                options={roomTypes}
+                placeholder="Selectează camera"
+                allowClear={false}
+              />
+            </Field>
+          )}
           <Field label="Numele proiectului" help="Lasă gol și îl numesc eu după cameră și client">
             <Input
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder={suggestedName(projectRoom)}
+              placeholder={suggestedName()}
               onKeyDown={(e) => e.key === "Enter" && createProject()}
+              autoFocus={!!projectTarget}
             />
           </Field>
           <p className="text-xs text-muted">
@@ -510,8 +601,27 @@ export function ContactPanels({
         title="Șterge camera"
         message={
           <>
-            Sigur ștergi camera <b>{deleteRoom?.cells[0]?.text}</b>? O cameră care are proiecte nu
+            Sigur ștergi camera <b>{deleteRoom?.name}</b>? O cameră care are proiecte nu
             poate fi ștearsă — mută sau șterge întâi proiectele.
+          </>
+        }
+      />
+      <ConfirmDialog
+        open={!!deleteProject}
+        onClose={() => setDeleteProject(null)}
+        onConfirm={async () => {
+          const res = await deleteRecords("opportunity", [deleteProject!.id]);
+          setDeleteProject(null);
+          if (!res.ok) toast.error(res.error ?? "Eroare");
+          else {
+            toast.success("Proiect șters");
+            router.refresh();
+          }
+        }}
+        title="Șterge proiectul"
+        message={
+          <>
+            Sigur ștergi proiectul <b>{deleteProject?.name}</b>, cu estimările lui?
           </>
         }
       />
@@ -573,5 +683,125 @@ export function ContactPanels({
         }
       />
     </div>
+  );
+}
+
+const ROW_ACTION =
+  "grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-foreground/[0.07] hover:text-foreground";
+
+/** O cameră în tabel: rândul ei (nume, sumă, acțiuni) și, dedesubt, proiectele ei. */
+function RoomGroup({
+  room,
+  onProject,
+  onEdit,
+  onDelete,
+  onDeleteProject,
+}: {
+  room: RoomItem;
+  onProject?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onDeleteProject: (p: ProjectItem) => void;
+}) {
+  const real = room.id > 0;
+  const n = room.projects.length;
+  return (
+    <Fragment>
+      <tr className="border-b border-border/70 bg-subtle/40">
+        <td colSpan={5} className="px-4 py-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <DoorOpen className="h-3.5 w-3.5 text-muted" aria-hidden />
+            {real ? (
+              <Link
+                href={`/admin/room/${room.id}`}
+                className="font-semibold underline-offset-4 transition-colors hover:text-primary hover:underline"
+              >
+                {room.name}
+              </Link>
+            ) : (
+              <span className="font-semibold text-muted">{room.name}</span>
+            )}
+            <span className="text-xs text-muted">
+              {n === 0 ? "niciun proiect" : n === 1 ? "1 proiect" : `${n} proiecte`}
+              {room.sumText && <> · {room.sumText}</>}
+              {room.createdText && <> · creată {room.createdText}</>}
+            </span>
+            {real && (
+              <button
+                className="ml-1 inline-flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
+                onClick={onProject}
+                title="Proiect nou în această cameră"
+              >
+                <Plus className="h-3.5 w-3.5" /> Proiect
+              </button>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-1.5">
+          {real && (
+            <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
+              <button className={ROW_ACTION} onClick={onEdit} title="Editează camera" aria-label="Editează camera">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                className={`${ROW_ACTION} hover:bg-danger/10 hover:text-danger`}
+                onClick={onDelete}
+                title="Șterge camera"
+                aria-label="Șterge camera"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+      {room.projects.map((p) => (
+        <tr key={p.id} className="border-b border-border/70 transition-colors last:border-0 hover:bg-subtle/60">
+          <td className="w-full max-w-0 truncate py-2 pl-10 pr-3">
+            <Link
+              href={`/admin/opportunity/${p.id}`}
+              className="font-medium underline-offset-4 transition-colors hover:text-primary hover:underline"
+              title={p.name}
+            >
+              {p.name}
+            </Link>
+          </td>
+          <td className="whitespace-nowrap px-3 py-2">
+            {p.stage ? <Badge color={p.stage.badge}>{p.stage.text}</Badge> : <span className="text-foreground/80">—</span>}
+          </td>
+          <td className="whitespace-nowrap px-3 py-1.5 tabular-nums leading-tight">
+            <span className="block text-foreground/80">{p.valueText}</span>
+            {p.valueSubText && <span className="block text-[11px] text-muted">{p.valueSubText}</span>}
+          </td>
+          <td className="whitespace-nowrap px-3 py-2 text-foreground/80">{p.deadlineText}</td>
+          <td className="whitespace-nowrap px-3 py-2">
+            <FileChips files={p.files} href={`/admin/opportunity/${p.id}`} />
+          </td>
+          <td className="px-2 py-1.5">
+            <div className="flex items-center justify-end">
+              <button
+                className={`${ROW_ACTION} hover:bg-danger/10 hover:text-danger`}
+                onClick={() => onDeleteProject(p)}
+                title="Șterge proiectul"
+                aria-label="Șterge proiectul"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+      {real && n === 0 && (
+        <tr className="border-b border-border/70 last:border-0">
+          <td colSpan={6} className="py-2 pl-10 pr-4 text-xs text-muted">
+            Camera nu are încă niciun proiect —{" "}
+            <button className="cursor-pointer font-medium text-foreground underline-offset-4 hover:underline" onClick={onProject}>
+              adaugă unul
+            </button>
+            .
+          </td>
+        </tr>
+      )}
+    </Fragment>
   );
 }

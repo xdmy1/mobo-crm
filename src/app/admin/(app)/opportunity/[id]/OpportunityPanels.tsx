@@ -46,6 +46,7 @@ export function OpportunityPanels({
   quoteRows,
   attach2D,
   attach3D,
+  attachSpec,
   attachOther,
   taskRows,
   noteRows,
@@ -68,6 +69,7 @@ export function OpportunityPanels({
   quoteRows: PanelRow[];
   attach2D: PanelRow[];
   attach3D: PanelRow[];
+  attachSpec: PanelRow[];
   attachOther: PanelRow[];
   taskRows: PanelRow[];
   noteRows: PanelRow[];
@@ -75,7 +77,7 @@ export function OpportunityPanels({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [attachDrawer, setAttachDrawer] = useState<null | "PROIECT2D" | "PROIECT3D" | "ATASAMENT">(null);
+  const [attachDrawer, setAttachDrawer] = useState<null | "PROIECT2D" | "PROIECT3D" | "SPECIFICATII" | "ATASAMENT">(null);
   const [taskOpen, setTaskOpen] = useState(false);
   // venit din „Proiect nou” (?wizard=1): Bordul Tehnic e deja deschis, fără alt click
   const startWithWizard = useSearchParams().get("wizard") === "1";
@@ -97,7 +99,7 @@ export function OpportunityPanels({
     );
   };
   const [del, setDel] = useState<{ entity: string; row: PanelRow } | null>(null);
-  const [fileTab, setFileTab] = useState<"Toate" | "2D" | "3D" | "Altele">("Toate");
+  const [fileTab, setFileTab] = useState<"Toate" | "2D" | "3D" | "Specificații" | "Altele">("Toate");
   const [noteOpen, setNoteOpen] = useState(false);
 
   // mesaje inline
@@ -115,10 +117,12 @@ export function OpportunityPanels({
   const attachForm = (type: string): FormConfig => ({
     title:
       type === "PROIECT2D"
-        ? "Creează Proiect2D"
+        ? "Adaugă proiect 2D"
         : type === "PROIECT3D"
-          ? "Creează Proiect3D"
-          : "Creează Atașament",
+          ? "Adaugă proiect 3D"
+          : type === "SPECIFICATII"
+            ? "Adaugă specificații"
+            : "Adaugă fișier",
     entity: "attachment",
     fields: [
       { name: "files", label: "Atașare", type: "file", required: true },
@@ -139,8 +143,9 @@ export function OpportunityPanels({
         defaultValue: type,
         options: [
           { value: "ATASAMENT", label: "Atașament" },
-          { value: "PROIECT2D", label: "Proiect2D" },
-          { value: "PROIECT3D", label: "Proiect3D" },
+          { value: "PROIECT2D", label: "2D" },
+          { value: "PROIECT3D", label: "3D" },
+          { value: "SPECIFICATII", label: "Specificații" },
           { value: "MASURARI", label: "Măsurări" },
         ],
       },
@@ -191,10 +196,17 @@ export function OpportunityPanels({
   const files = [
     ...attach2D.map((r) => ({ ...r, kind: "2D" as const })),
     ...attach3D.map((r) => ({ ...r, kind: "3D" as const })),
+    ...attachSpec.map((r) => ({ ...r, kind: "Specificații" as const })),
     ...attachOther.map((r) => ({ ...r, kind: "Altele" as const })),
   ];
   const shownFiles = fileTab === "Toate" ? files : files.filter((f) => f.kind === fileTab);
-  const FILE_TYPE = { Toate: "ATASAMENT", "2D": "PROIECT2D", "3D": "PROIECT3D", Altele: "ATASAMENT" } as const;
+  const FILE_TYPE = {
+    Toate: "ATASAMENT",
+    "2D": "PROIECT2D",
+    "3D": "PROIECT3D",
+    Specificații: "SPECIFICATII",
+    Altele: "ATASAMENT",
+  } as const;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_372px] xl:items-start">
@@ -362,7 +374,7 @@ export function OpportunityPanels({
           </div>
         </Collapse>
 
-        {/* Proiecte2D + Proiecte3D + Atașări = un singur loc pentru fișiere, filtrabil */}
+        {/* 2D + 3D + Specificații + restul = un singur loc pentru fișiere, filtrabil */}
         <Collapse
           title="Fișiere"
           icon={<Paperclip className="h-4 w-4 text-muted" />}
@@ -372,7 +384,7 @@ export function OpportunityPanels({
             <Button
               size="sm"
               variant="outline"
-              title="Încarcă un proiect 2D, 3D sau alt fișier — tipul se alege în formular"
+              title="Încarcă un proiect 2D, 3D, specificații sau alt fișier — tipul se alege în formular"
               onClick={() => setAttachDrawer(FILE_TYPE[fileTab])}
             >
               <Plus className="h-4 w-4" /> Adaugă
@@ -380,10 +392,10 @@ export function OpportunityPanels({
           }
         >
           <Segmented
-            className="mb-3 w-full [&>button]:flex-1"
+            className="mb-3 w-full [&>button]:flex-1 [&>button]:whitespace-nowrap [&>button]:px-1.5"
             value={fileTab}
             onChange={(v) => setFileTab(v as typeof fileTab)}
-            options={(["Toate", "2D", "3D", "Altele"] as const).map((k) => ({
+            options={(["Toate", "2D", "3D", "Specificații", "Altele"] as const).map((k) => ({
               value: k,
               label: k === "Toate" ? `Toate ${files.length}` : `${k} ${files.filter((f) => f.kind === k).length}`,
             }))}
@@ -392,7 +404,9 @@ export function OpportunityPanels({
             <p className="py-3 text-center text-[13px] text-muted">
               {fileTab === "2D" || fileTab === "3D"
                 ? `Niciun proiect ${fileTab} încărcat. Etapa „Contractat” îl poate cere.`
-                : "Niciun fișier încă."}
+                : fileTab === "Specificații"
+                  ? "Nicio specificație încărcată încă."
+                  : "Niciun fișier încă."}
             </p>
           ) : (
             <ul className="-mx-1 space-y-0.5">
@@ -402,7 +416,7 @@ export function OpportunityPanels({
                   className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-subtle/70"
                 >
                   <span className="grid h-7 w-9 shrink-0 place-items-center rounded-md bg-foreground/[0.06] text-[10px] font-semibold text-muted">
-                    {f.kind === "Altele" ? "FIȘ" : f.kind}
+                    {f.kind === "Altele" ? "FIȘ" : f.kind === "Specificații" ? "SPEC" : f.kind}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium">{f.cells[0]?.text}</span>

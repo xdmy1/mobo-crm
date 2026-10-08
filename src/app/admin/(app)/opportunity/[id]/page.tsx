@@ -93,39 +93,23 @@ export default async function OpportunityDetailPage({
     ],
   }));
 
-  const attach2D: PanelRow[] = opp.attachments
-    .filter((a) => a.type === "PROIECT2D")
-    .map((a) => ({
-      id: a.id,
-      cells: [
-        { text: a.name },
-        { text: a.staff ? `${a.staff.firstName} ${a.staff.lastName}` : "—" },
-        { text: fmtDateTime(a.createdAt) },
-      ],
-      downloadHref: `/api/files/${encodeURIComponent(a.filePath)}?download=1`,
-    }));
-  const attach3D: PanelRow[] = opp.attachments
-    .filter((a) => a.type === "PROIECT3D")
-    .map((a) => ({
-      id: a.id,
-      cells: [
-        { text: a.name },
-        { text: a.staff ? `${a.staff.firstName} ${a.staff.lastName}` : "—" },
-        { text: fmtDateTime(a.createdAt) },
-      ],
-      downloadHref: `/api/files/${encodeURIComponent(a.filePath)}?download=1`,
-    }));
-  const attachOther: PanelRow[] = opp.attachments
-    .filter((a) => a.type !== "PROIECT2D" && a.type !== "PROIECT3D")
-    .map((a) => ({
-      id: a.id,
-      cells: [
-        { text: a.name },
-        { text: a.staff ? `${a.staff.firstName} ${a.staff.lastName}` : "—" },
-        { text: fmtDateTime(a.createdAt) },
-      ],
-      downloadHref: `/api/files/${encodeURIComponent(a.filePath)}?download=1`,
-    }));
+  // fișierele proiectului, pe grupele din panoul „Fișiere”: 2D, 3D, Specificații, restul
+  const attachRows = (keep: (type: string) => boolean): PanelRow[] =>
+    opp.attachments
+      .filter((a) => keep(a.type))
+      .map((a) => ({
+        id: a.id,
+        cells: [
+          { text: a.name },
+          { text: a.staff ? `${a.staff.firstName} ${a.staff.lastName}` : "—" },
+          { text: fmtDateTime(a.createdAt) },
+        ],
+        downloadHref: `/api/files/${encodeURIComponent(a.filePath)}?download=1`,
+      }));
+  const attach2D = attachRows((t) => t === "PROIECT2D");
+  const attach3D = attachRows((t) => t === "PROIECT3D");
+  const attachSpec = attachRows((t) => t === "SPECIFICATII");
+  const attachOther = attachRows((t) => t !== "PROIECT2D" && t !== "PROIECT3D" && t !== "SPECIFICATII");
 
   const taskRows: PanelRow[] = opp.tasks.map((t) => ({
     id: t.id,
@@ -281,6 +265,7 @@ export default async function OpportunityDetailPage({
         quoteRows={quoteRows}
         attach2D={attach2D}
         attach3D={attach3D}
+        attachSpec={attachSpec}
         attachOther={attachOther}
         taskRows={taskRows}
         noteRows={noteRows}

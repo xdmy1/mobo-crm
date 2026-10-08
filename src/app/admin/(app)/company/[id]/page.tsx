@@ -103,7 +103,7 @@ export default async function CompanyDetailPage({
                   <Link href={`/admin/contact/${c.id}`} className="font-medium underline-offset-4 transition-colors hover:text-primary hover:underline">
                     {personName(c)}
                   </Link>
-                  <span className="text-xs text-muted">{c.phone ?? c.email ?? c.humanId}</span>
+                  <span className="text-xs text-muted">{c.phone ?? c.email ?? `#${c.humanId}`}</span>
                 </li>
               ))}
             </ul>

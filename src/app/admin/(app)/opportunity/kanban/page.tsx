@@ -38,7 +38,7 @@ export default async function ProductionKanbanPage() {
       id: o.id,
       columnId: o.stageId!,
       title: o.contact ? personName(o.contact) : o.name,
-      humanId: o.contact?.humanId,
+      humanId: o.contact ? `#${o.contact.humanId}` : undefined,
       datetime: fmtDateTime(o.createdAt),
       sum: sum > 0 ? fmtLei(sum) : undefined,
       amount: sum,

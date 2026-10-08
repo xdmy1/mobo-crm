@@ -7,7 +7,6 @@ import fs from "fs";
 import path from "path";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { generateHumanId } from "@/lib/humanId";
 import { getActiveCatalog } from "@/lib/calc/getCatalog";
 import { computeQuote, EMPTY_CONFIG, type QuoteConfig } from "@/lib/calc/engine";
 import {
@@ -80,7 +79,6 @@ async function ensureDemoClient() {
   ]);
   const contact = await prisma.contact.create({
     data: {
-      humanId: await generateHumanId(source?.id ?? null),
       firstName: "Damian",
       lastName: "B.",
       phone: "+37369123456",

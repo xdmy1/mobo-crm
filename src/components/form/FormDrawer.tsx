@@ -288,7 +288,7 @@ export function FormDrawer({
                 <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">
-                    Există deja: {duplicate.name} · {duplicate.humanId}
+                    Există deja: {duplicate.name} · #{duplicate.humanId}
                   </span>
                   <span className="block text-xs text-muted">
                     {[duplicate.stage, duplicate.staff].filter(Boolean).join(" · ") || "client existent"} — deschide

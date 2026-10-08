@@ -10,8 +10,8 @@ export function personName(p?: Named | null): string {
   return `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() || EMPTY;
 }
 
-/** „Ion Rusu · 06/4/09/26” — client + ID-ul lui, în liste de selecție și pe carduri. */
-export function contactLabel(c?: (Named & { humanId?: string | null }) | null): string {
+/** „Ion Rusu · #4” — client + ID-ul lui, în liste de selecție și pe carduri. */
+export function contactLabel(c?: (Named & { humanId?: number | null }) | null): string {
   if (!c) return EMPTY;
-  return c.humanId ? `${personName(c)} · ${c.humanId}` : personName(c);
+  return c.humanId != null ? `${personName(c)} · #${c.humanId}` : personName(c);
 }

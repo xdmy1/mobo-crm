@@ -37,7 +37,7 @@ export async function contractDefaults(contactId: number): Promise<{
 /** În timp ce tastezi telefonul unui client nou: există deja? (același număr, oricum ar fi scris) */
 export async function findContactByPhone(
   raw: string
-): Promise<{ id: number; name: string; humanId: string; stage: string | null; staff: string | null } | null> {
+): Promise<{ id: number; name: string; humanId: number; stage: string | null; staff: string | null } | null> {
   const user = await getCurrentUser();
   if (!user) return null;
   const phone = normalizePhone(raw);
@@ -58,24 +58,33 @@ export async function findContactByPhone(
  */
 export async function quickProject(values: {
   contactId: number;
-  roomTypeId: number;
+  /** o cameră existentă a clientului (din rândul ei în fișă) … */
+  roomId?: number;
+  /** … sau tipul de cameră: se refolosește camera de acest tip, iar dacă lipsește se creează */
+  roomTypeId?: number;
   name?: string;
 }): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Neautentificat" };
   if (!can(user, "create-opportunity")) return { ok: false, error: "Nu ai permisiunea necesară." };
 
-  const [contact, roomType] = await Promise.all([
-    prisma.contact.findFirst({ where: { id: values.contactId, deletedAt: null } }),
-    prisma.roomType.findUnique({ where: { id: values.roomTypeId } }),
-  ]);
-  if (!contact || !roomType) return { ok: false, error: "Client sau cameră inexistentă." };
+  const contact = await prisma.contact.findFirst({ where: { id: values.contactId, deletedAt: null } });
+  if (!contact) return { ok: false, error: "Clientul nu există." };
 
-  const room =
-    (await prisma.room.findFirst({ where: { contactId: contact.id, roomTypeId: roomType.id } })) ??
-    (await prisma.room.create({ data: { contactId: contact.id, roomTypeId: roomType.id, name: roomType.name } }));
+  let room = values.roomId
+    ? await prisma.room.findFirst({ where: { id: values.roomId, contactId: contact.id } })
+    : null;
+  if (!room) {
+    const roomType = values.roomTypeId
+      ? await prisma.roomType.findUnique({ where: { id: values.roomTypeId } })
+      : null;
+    if (!roomType) return { ok: false, error: "Alege camera." };
+    room =
+      (await prisma.room.findFirst({ where: { contactId: contact.id, roomTypeId: roomType.id } })) ??
+      (await prisma.room.create({ data: { contactId: contact.id, roomTypeId: roomType.id, name: roomType.name } }));
+  }
 
-  const label = roomType.name.replace(/^Cameră\s+/i, "");
+  const label = room.name.replace(/^Cameră\s+/i, "");
   const name = values.name?.trim() || `${label === "Default" ? "Proiect" : label} ${contact.lastName}`.trim();
   const opp = await prisma.opportunity.create({
     data: {

@@ -15,8 +15,9 @@ export const dynamic = "force-dynamic";
 
 const TYPE_OPTIONS = [
   { value: "ATASAMENT", label: "Atașament" },
-  { value: "PROIECT2D", label: "Proiect2D" },
-  { value: "PROIECT3D", label: "Proiect3D" },
+  { value: "PROIECT2D", label: "2D" },
+  { value: "PROIECT3D", label: "3D" },
+  { value: "SPECIFICATII", label: "Specificații" },
   { value: "CONTRACT", label: "Contract" },
   { value: "OFERTA", label: "Ofertă" },
   { value: "MASURARI", label: "Măsurări" },

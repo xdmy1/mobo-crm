@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { daysBetween, fmtDate, fmtDateTime, fmtEur, fmtEurLei, EMPTY } from "@/lib/format";
+import { daysBetween, fmtDate, fmtDateTime, fmtEur, fmtEurLei, fmtLei, EMPTY } from "@/lib/format";
 import { personName } from "@/lib/people";
 import { countedQuotes, roomSum, sumQuotes } from "@/lib/sums";
 import { opportunityStageColor } from "@/lib/status";
@@ -23,7 +23,13 @@ import {
 } from "@/components/documents/ContractCreateButton";
 import { PresentationCreateButton } from "@/components/documents/PresentationCreateButton";
 import { ContactSidebar } from "./ContactSidebar";
-import { ContactPanels, type PanelRow, type TimelineItem } from "./ContactPanels";
+import {
+  ContactPanels,
+  type PanelRow,
+  type ProjectItem,
+  type RoomItem,
+  type TimelineItem,
+} from "./ContactPanels";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +51,7 @@ export default async function ContactDetailPage({
       source: true,
       company: true,
       productionSequence: true,
-      rooms: { orderBy: { createdAt: "desc" } },
+      rooms: { orderBy: { createdAt: "asc" } },
       contracts: {
         orderBy: { createdAt: "desc" },
         include: { opportunities: { include: { opportunity: true } } },
@@ -58,8 +64,8 @@ export default async function ContactDetailPage({
       attachments: { orderBy: { createdAt: "desc" } },
       opportunities: {
         where: { deletedAt: null },
-        orderBy: { createdAt: "desc" },
-        include: { room: true, stage: true, quotes: true },
+        orderBy: { createdAt: "asc" },
+        include: { room: true, stage: true, quotes: true, attachments: { select: { type: true } } },
       },
       stageHistory: {
         orderBy: { enteredAt: "desc" },
@@ -80,22 +86,39 @@ export default async function ContactDetailPage({
       prisma.contactStage.findMany({ orderBy: { order: "asc" } }),
     ]);
 
-  // sume camere — aceeași regulă ca peste tot (doar estimările active), din lib/sums
-  const roomRows: PanelRow[] = await Promise.all(
+  // proiectele clientului, fiecare cu etapa, valoarea (doar estimările active) și ce fișiere are: 2D / 3D / Specificații
+  const projectItem = (o: (typeof contact.opportunities)[number]): ProjectItem => {
+    const { eur, lei } = sumQuotes(countedQuotes(o.quotes));
+    const count = (type: string) => o.attachments.filter((a) => a.type === type).length;
+    return {
+      id: o.id,
+      name: o.name,
+      stage: o.stage ? { text: o.stage.name, badge: opportunityStageColor(o.stage.name) } : null,
+      valueText: lei > 0 ? fmtEur(eur) : EMPTY,
+      valueSubText: lei > 0 ? fmtLei(lei) : null,
+      deadlineText: fmtDate(o.closeDate),
+      files: { d2: count("PROIECT2D"), d3: count("PROIECT3D"), spec: count("SPECIFICATII") },
+    };
+  };
+
+  // camerele, cu proiectele lor înăuntru — sumă pe cameră după aceeași regulă ca peste tot (lib/sums)
+  const rooms: RoomItem[] = await Promise.all(
     contact.rooms.map(async (r) => {
       const { eur, lei } = await roomSum(r.id);
       return {
         id: r.id,
-        cells: [
-          { text: r.name, href: `/admin/room/${r.id}` },
-          { text: fmtEurLei(eur, lei) },
-          { text: fmtDateTime(r.createdAt) },
-          { text: fmtDateTime(r.updatedAt) },
-        ],
-        raw: { roomTypeId: r.roomTypeId ? String(r.roomTypeId) : null, name: r.name },
+        name: r.name,
+        roomTypeId: r.roomTypeId ? String(r.roomTypeId) : null,
+        sumText: lei > 0 ? fmtEurLei(eur, lei) : null,
+        createdText: fmtDate(r.createdAt),
+        projects: contact.opportunities.filter((o) => o.roomId === r.id).map(projectItem),
       };
     })
   );
+  // proiecte rămase fără cameră (create din lista generală) — tot în același panou, ca să nu lipsească nimic
+  const orphanProjects: ProjectItem[] = contact.opportunities
+    .filter((o) => o.roomId == null || !contact.rooms.some((r) => r.id === o.roomId))
+    .map(projectItem);
 
   const contractRows: PanelRow[] = contact.contracts.map((c) => ({
     id: c.id,
@@ -122,23 +145,6 @@ export default async function ContactDetailPage({
       noteReadCell(n),
     ],
   }));
-
-  // proiectele clientului — legătura directă client → proiect → estimare, care lipsea din fișă
-  const projectRows: PanelRow[] = contact.opportunities.map((o) => {
-    const { eur, lei } = sumQuotes(countedQuotes(o.quotes));
-    return {
-      id: o.id,
-      cells: [
-        { text: o.name, href: `/admin/opportunity/${o.id}` },
-        { text: o.room?.name ?? EMPTY, href: o.room ? `/admin/room/${o.room.id}` : undefined },
-        o.stage
-          ? { text: o.stage.name, badge: opportunityStageColor(o.stage.name) }
-          : { text: EMPTY },
-        { text: lei > 0 ? fmtEurLei(eur, lei) : EMPTY },
-        { text: fmtDate(o.closeDate) },
-      ],
-    };
-  });
 
   const offerRows: PanelRow[] = contact.offers.map((o) => ({
     id: o.id,
@@ -263,10 +269,10 @@ export default async function ContactDetailPage({
           defaultRecipientId={
             contact.staffId && contact.staffId !== user.id ? String(contact.staffId) : null
           }
-          projectRows={projectRows}
+          rooms={rooms}
+          orphanProjects={orphanProjects}
           roomTypeIds={contact.rooms.map((r) => r.roomTypeId).filter((id): id is number => id != null)}
           offerRows={offerRows}
-          roomRows={roomRows}
           contractRows={contractRows}
           noteRows={noteRows}
           timeline={timeline}

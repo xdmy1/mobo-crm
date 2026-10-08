@@ -65,7 +65,7 @@ export interface PresentationData {
     address?: string | null;
   };
   clientName: string;
-  humanId: string;
+  humanId: number;
   dateText: string;
   projects: PresentationProject[];
   totalEur: number;

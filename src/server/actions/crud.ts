@@ -45,7 +45,7 @@ export async function saveRecord(
       for (const [field, kind] of Object.entries(cfg.fields)) {
         if (field in out) data[field] = coerce(kind, out[field]);
       }
-      for (const extra of ["humanId", "passwordHash", "authorId", "staffId"]) {
+      for (const extra of ["passwordHash", "authorId", "staffId"]) {
         if (out[extra] !== undefined) data[extra] = out[extra];
       }
       Object.assign(merged, out);

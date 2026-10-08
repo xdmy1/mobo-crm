@@ -49,8 +49,8 @@ const fullName = (p?: { firstName: string; lastName: string } | null) =>
 
 /** Celulă-link către client — aceeași formă în toate listele. */
 const contactCell = (
-  c?: { id: number; firstName: string; lastName: string; humanId?: string | null } | null
-): Cell => (c ? { t: personName(c), href: `/admin/contact/${c.id}`, sub: c.humanId ?? undefined } : null);
+  c?: { id: number; firstName: string; lastName: string; humanId?: number | null } | null
+): Cell => (c ? { t: personName(c), href: `/admin/contact/${c.id}`, sub: c.humanId != null ? `#${c.humanId}` : undefined } : null);
 
 /** Celulă-link către proiect. */
 const opportunityCell = (o?: { id: number; name: string } | null): Cell =>
@@ -307,7 +307,8 @@ export async function getList(
           { lastName: { contains: q, mode: "insensitive" } },
           { phone: { contains: q } },
           { email: { contains: q, mode: "insensitive" } },
-          { humanId: { contains: q } },
+          // ID-ul e număr: „12” sau „#12” îl găsește exact
+          ...(/^#?\d+$/.test(q) ? [{ humanId: Number(q.replace("#", "")) }] : []),
         ];
       const orderBy =
         sort === "name"
@@ -338,7 +339,7 @@ export async function getList(
           id: c.id,
           viewHref: `/admin/contact/${c.id}`,
           cells: {
-            humanId: c.humanId,
+            humanId: String(c.humanId),
             name: { t: personName(c), href: `/admin/contact/${c.id}` },
             phone: c.phone,
             staff: fullName(c.staff),
@@ -794,8 +795,9 @@ export async function getList(
       ]);
       const typeLabels: Record<string, string> = {
         ATASAMENT: "Atașament",
-        PROIECT2D: "Proiect2D",
-        PROIECT3D: "Proiect3D",
+        PROIECT2D: "2D",
+        PROIECT3D: "3D",
+        SPECIFICATII: "Specificații",
         CONTRACT: "Contract",
         OFERTA: "Ofertă",
         MASURARI: "Măsurări",

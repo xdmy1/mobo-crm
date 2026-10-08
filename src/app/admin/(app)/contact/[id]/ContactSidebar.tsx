@@ -31,7 +31,7 @@ import { ContactComment } from "./ContactComment";
 
 interface ContactData {
   id: number;
-  humanId: string;
+  humanId: number;
   firstName: string;
   lastName: string;
   email: string | null;
