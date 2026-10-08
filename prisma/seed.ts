@@ -261,7 +261,7 @@ async function main() {
   }
 
   // ── Sarcini: tip / stare / prioritate ──
-  for (const name of ["Todo", "Apel", "Măsurare", "Livrare"]) {
+  for (const name of ["Todo", "Apel", "Întâlnire", "Contractare", "Măsurare", "Livrare"]) {
     const existing = await prisma.taskType.findFirst({ where: { name } });
     if (!existing) await prisma.taskType.create({ data: { name } });
   }

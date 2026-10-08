@@ -7,45 +7,45 @@ import { Button } from "@/components/ui/Button";
 import type { SelectOption } from "@/lib/listTypes";
 
 export function CalendarFilters({
-  stages,
+  types,
   staff,
-  currentStage,
+  currentType,
   currentStaff,
   month,
 }: {
-  stages: SelectOption[];
+  types: SelectOption[];
   staff: SelectOption[];
-  currentStage: string | null;
+  currentType: string | null;
   currentStaff: string | null;
   month: string;
 }) {
   const router = useRouter();
 
-  const nav = (stage: string | null, staffId: string | null) => {
+  const nav = (type: string | null, staffId: string | null) => {
     const p = new URLSearchParams({ m: month });
-    if (stage) p.set("stage", stage);
+    if (type) p.set("type", type);
     if (staffId) p.set("staff", staffId);
     router.replace(`/admin/calendar?${p.toString()}`);
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {(currentStage || currentStaff) && (
+      {(currentType || currentStaff) && (
         <Button variant="ghost" onClick={() => nav(null, null)}>
           <FunnelX className="h-4 w-4" /> Resetează filtrele
         </Button>
       )}
       <Select
         className="w-44"
-        value={currentStage}
+        value={currentType}
         onChange={(v) => nav(v, currentStaff)}
-        options={stages}
-        placeholder="Toate etapele"
+        options={types}
+        placeholder="Toate tipurile"
       />
       <Select
         className="w-48"
         value={currentStaff}
-        onChange={(v) => nav(currentStage, v)}
+        onChange={(v) => nav(currentType, v)}
         options={staff}
         placeholder="Toți responsabilii"
       />

@@ -52,7 +52,7 @@ const PLACES: Array<[string, string, string]> = [
   ["Bord Finanțe", "/admin/finances", "încasări, datorii, profit; se deschide cu parola și codul 2FA, din lacătul din bara de sus"],
   ["Estimare", "/admin/quote", "calculatorul de preț și toate estimările"],
   ["Contracte și Oferte", "/admin/contracts", "documentele generate, de descărcat sau retrimis"],
-  ["Calendar și Sarcini", "/admin/calendar", "termene, livrări și ce ai de făcut"],
+  ["Calendar și Sarcini", "/admin/calendar", "întâlniri, contractări, măsurări, livrări planificate și termenele promise"],
   ["Setup", "/admin/setup", "angajați, roluri, nomenclatoare, prețuri"],
 ];
 
