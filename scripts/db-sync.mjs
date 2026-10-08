@@ -8,6 +8,7 @@
 
 import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
+import { PrismaClient } from "@prisma/client";
 
 if (!process.env.VERCEL && !process.env.DB_SYNC) process.exit(0);
 
@@ -25,17 +26,33 @@ if (!url) {
   process.exit(0);
 }
 
+const run = (cmd) => execSync(cmd, { stdio: "inherit", env: { ...process.env, DATABASE_URL: url } });
+const push = () => run("npx prisma db push --skip-generate");
+
+// O bază goală (prima pornire pe VPS, un mediu nou) nu are ce migra: schema se creează întâi,
+// altfel scripturile din scripts/sql cad pe tabele care încă nu există.
+async function tableCount() {
+  const prisma = new PrismaClient({ datasourceUrl: url });
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = current_schema()",
+    );
+    return rows[0].n;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+const empty = (await tableCount()) === 0;
+if (empty) {
+  console.log("db-sync: bază goală — creez schema înainte de migrările de date");
+  push();
+}
+
 // migrări de date din scripts/sql (în ordinea numelui), ÎNAINTE de push; fiecare e idempotentă
 // și se păzește singură (ex. rulează doar dacă lipsește coloana pe care o adaugă)
 for (const file of readdirSync("scripts/sql").filter((f) => f.endsWith(".sql")).sort()) {
   console.log(`db-sync: ${file}`);
-  execSync(`npx prisma db execute --url "$DATABASE_URL" --file scripts/sql/${file}`, {
-    stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: url },
-  });
+  run(`npx prisma db execute --url "$DATABASE_URL" --file scripts/sql/${file}`);
 }
 
-execSync("npx prisma db push --skip-generate", {
-  stdio: "inherit",
-  env: { ...process.env, DATABASE_URL: url },
-});
+if (!empty) push();
