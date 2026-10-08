@@ -1,4 +1,5 @@
-// Rulează înainte de `next build`, DOAR pe Vercel: aduce schema bazei Neon la zi cu prisma/schema.prisma.
+// Aduce schema bazei la zi cu prisma/schema.prisma. Rulează înainte de `next build` pe Vercel,
+// iar pe VPS (Docker/Coolify) la pornirea containerului, cu DB_SYNC=1 — la build baza nu e accesibilă.
 //
 // Fără pasul ăsta, o coloană nouă din schemă ajunge în cod înaintea bazei și orice interogare
 // pe tabelul respectiv cade în producție. `prisma db push` fără `--accept-data-loss` aplică doar
@@ -8,7 +9,7 @@
 import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 
-if (!process.env.VERCEL) process.exit(0);
+if (!process.env.VERCEL && !process.env.DB_SYNC) process.exit(0);
 
 // integrarea Neon pune prefixul ales la conectare (aici STORAGE_); schema engine vrea conexiunea directă
 const url =
