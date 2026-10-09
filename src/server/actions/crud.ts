@@ -110,10 +110,19 @@ export async function deleteRecords(
 
   try {
     if (cfg.softDelete) {
+      const now = new Date();
       await model(cfg.model).updateMany({
         where: { id: { in: ids } },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: now },
       });
+      // un client șters își ia și proiectele cu el — altfel rămân pe borduri și în calendar;
+      // același moment pe toate, ca restaurarea clientului să le aducă înapoi doar pe acestea
+      if (entity === "contact") {
+        await prisma.opportunity.updateMany({
+          where: { contactId: { in: ids }, deletedAt: null },
+          data: { deletedAt: now },
+        });
+      }
     } else {
       await model(cfg.model).deleteMany({ where: { id: { in: ids } } });
     }
@@ -141,6 +150,20 @@ export async function restoreRecords(
   if (!user) return { ok: false, error: "Neautentificat" };
   const cfg = REGISTRY[entity];
   if (!cfg?.softDelete) return { ok: false, error: "Entitatea nu suportă restaurare." };
+  if (entity === "contact") {
+    // doar proiectele șterse odată cu clientul (același moment), nu cele șterse separat înainte
+    const contacts = await prisma.contact.findMany({
+      where: { id: { in: ids }, deletedAt: { not: null } },
+      select: { id: true, deletedAt: true },
+    });
+    for (const c of contacts) {
+      if (!c.deletedAt) continue;
+      await prisma.opportunity.updateMany({
+        where: { contactId: c.id, deletedAt: c.deletedAt },
+        data: { deletedAt: null },
+      });
+    }
+  }
   await model(cfg.model).updateMany({
     where: { id: { in: ids } },
     data: { deletedAt: null },
