@@ -119,7 +119,7 @@ const NAV: NavGroup[] = [
     label: "Bord Clienți",
     items: [
       { label: "Persoane Fizice", href: "/admin/contact", icon: Users },
-      { label: "Meta Leads", href: "/admin/meta", icon: MetaNavIcon },
+      { label: "Meta Ads", href: "/admin/meta", icon: MetaNavIcon },
       { label: "Persoane Juridice", href: "/admin/company", icon: Building2 },
       { label: "Proiecte", href: "/admin/opportunity", icon: FolderKanban },
       { label: "Contracte", href: "/admin/contracts", icon: FileSignature },

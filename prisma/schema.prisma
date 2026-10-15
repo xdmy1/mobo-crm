@@ -889,8 +889,17 @@ model MetaLead {
   adId      String?
   adName    String?
   formId    String?
+  /// datele persoanei, așa cum au venit din formular / profil — lead-ul stă aici până e transformat în client
+  firstName String?
+  lastName  String?
+  phone     String?
+  email     String?
+  /// clientul creat (sau legat) din acest lead — doar când cineva apasă „Creează client”
   contactId Int?
   contact   Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  convertedAt DateTime?
+  /// lead respins (spam, greșit) — ascuns din listă, dar păstrat
+  archivedAt  DateTime?
   /// răspunsul Graph API (formular) sau primul eveniment de mesagerie, așa cum a venit
   raw       Json
   /// de ce nu s-a putut crea clientul (ex. Graph API indisponibil); null = procesat

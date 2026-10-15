@@ -38,7 +38,7 @@ export function MetaPanel({ leads }: { leads: MetaLeadView[] }) {
       count={messages || undefined}
       extra={
         <Link href="/admin/meta" className="text-[12px] font-medium text-muted hover:text-foreground">
-          toate lead-urile Meta
+          toate lead-urile din Meta Ads
         </Link>
       }
     >

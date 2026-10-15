@@ -22,7 +22,7 @@ import {
   OfferCreateButton,
 } from "@/components/documents/ContractCreateButton";
 import { PresentationCreateButton } from "@/components/documents/PresentationCreateButton";
-import { parseFieldData, type LeadgenField } from "@/lib/meta/parse";
+import { parseFieldData, type LeadAnswer, type LeadgenField } from "@/lib/meta/parse";
 import { ContactSidebar } from "./ContactSidebar";
 import { MetaPanel, type MetaLeadView } from "./MetaPanel";
 import {
@@ -162,8 +162,8 @@ export default async function ContactDetailPage({
 
   // de unde a venit din Meta (formular / Messenger / Instagram) și ce a scris
   const metaLeads: MetaLeadView[] = contact.metaLeads.map((l) => {
-    const raw = l.raw as { field_data?: LeadgenField[] } | null;
-    const form = l.kind === "LEADGEN" && raw?.field_data ? parseFieldData(raw.field_data) : null;
+    const raw = l.raw as { field_data?: LeadgenField[]; answers?: LeadAnswer[] } | null;
+    const answers = raw?.answers ?? (l.kind === "LEADGEN" && raw?.field_data ? parseFieldData(raw.field_data).answers : []);
     return {
       id: l.id,
       kind: l.kind,
@@ -172,10 +172,7 @@ export default async function ContactDetailPage({
       adId: l.adId,
       formId: l.formId,
       createdText: fmtDateTime(l.createdAt),
-      details: [
-        form?.furnitureType ? { label: "Tip", value: form.furnitureType } : null,
-        form?.budget ? { label: "Buget", value: `${form.budget} EUR` } : null,
-      ].filter((d): d is { label: string; value: string } => d != null),
+      details: answers.map((a) => ({ label: a.question.replace(/:\s*$/, ""), value: a.answer })),
       messages: l.messages.map((m) => ({ id: m.id, text: m.text, whenText: fmtDateTime(m.sentAt) })),
     };
   });

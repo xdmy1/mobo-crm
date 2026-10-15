@@ -14,47 +14,101 @@ export interface LeadgenField {
   values?: Array<string | null | undefined>;
 }
 
+/** o întrebare din definiția formularului (`GET /{form_id}?fields=questions`): cheie, etichetă, tip */
+export interface FormQuestion {
+  key?: string;
+  label?: string;
+  /** FIRST_NAME, LAST_NAME, FULL_NAME, PHONE, EMAIL, CUSTOM, … */
+  type?: string;
+}
+
+/** un răspuns la o întrebare a formularului, cu textul întrebării așa cum l-a văzut clientul */
+export interface LeadAnswer {
+  key: string;
+  question: string;
+  answer: string;
+}
+
 export interface ParsedLeadgen {
   firstName: string;
   lastName: string;
   /** în forma canonică din CRM (+373…) */
   phone: string | null;
   email: string | null;
-  /** „Ce tip de mobilă căutați?” */
+  /** răspunsul la „Ce tip de mobilă căutați?” (sau orice întrebare cu „tip”), dacă există */
   furnitureType: string | null;
-  /** „Ce buget aproximativ aveți? (EUR)” */
+  /** răspunsul la întrebarea despre buget, dacă există */
   budget: string | null;
+  /** toate răspunsurile la întrebările custom, în ordinea formularului */
+  answers: LeadAnswer[];
 }
 
 /** cheia întrebării fără diacritice și cu litere mici: „Ce buget aveți?” → „ce buget aveti?” */
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const words = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean);
 
-const STANDARD = new Set(["full_name", "first_name", "last_name", "name", "phone_number", "phone", "email"]);
+type Role = "first" | "last" | "full" | "phone" | "email" | "custom";
 
-export function parseFieldData(fields: LeadgenField[] | null | undefined): ParsedLeadgen {
-  const list = (fields ?? []).map((f) => ({ key: fold(f.name ?? ""), value: f.values?.find((v) => v && v.trim())?.trim() ?? null }));
-  const pick = (pred: (key: string) => boolean) => list.find((f) => f.value && pred(f.key))?.value ?? null;
+/** rolul unui câmp: din tipul întrebării (când avem definiția formularului), altfel din cheie */
+function roleOf(key: string, type?: string): Role {
+  switch (type) {
+    case "FIRST_NAME": return "first";
+    case "LAST_NAME": return "last";
+    case "FULL_NAME": return "full";
+    case "PHONE": return "phone";
+    case "EMAIL": return "email";
+    case "CUSTOM": return "custom";
+  }
+  const k = fold(key);
+  if (k === "first_name" || k === "prenume" || k === "prenumele") return "first";
+  if (k === "last_name" || k === "nume" || k === "numele" || k.includes("nume_de_familie") || k === "familia") return "last";
+  if (k === "full_name" || k === "name" || k.includes("nume_complet") || k.includes("nume_si_prenume") || k.includes("nume_prenume")) return "full";
+  if (k === "phone_number" || k.includes("phone") || k.includes("telefon")) return "phone";
+  if (k === "email" || k.includes("email") || k.includes("e-mail") || k.includes("e_mail")) return "email";
+  return "custom";
+}
 
-  let firstName = pick((k) => k === "first_name") ?? "";
-  let lastName = pick((k) => k === "last_name") ?? "";
+/** „ce_buget_aveți?_(eur)” → „Ce buget aveți? (eur)” — când nu avem eticheta din formular */
+export function humanizeKey(key: string): string {
+  const text = key.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text[0].toUpperCase() + text.slice(1) : key;
+}
+
+export function parseFieldData(fields: LeadgenField[] | null | undefined, questions?: FormQuestion[] | null): ParsedLeadgen {
+  const byKey = new Map<string, FormQuestion>();
+  for (const q of questions ?? []) if (q.key) byKey.set(q.key, q);
+  const list = (fields ?? [])
+    .filter((f) => f.name)
+    .map((f) => {
+      const key = f.name as string;
+      const q = byKey.get(key);
+      return { key, role: roleOf(key, q?.type), label: q?.label?.trim() || humanizeKey(key), value: f.values?.find((v) => v && v.trim())?.trim() ?? null };
+    });
+  const pick = (role: Role) => list.find((f) => f.role === role && f.value)?.value ?? null;
+
+  let firstName = pick("first") ?? "";
+  let lastName = pick("last") ?? "";
   if (!firstName && !lastName) {
-    const full = pick((k) => k === "full_name" || k === "name");
+    const full = pick("full");
     if (full) {
       const parts = full.split(/\s+/);
       firstName = parts[0];
       lastName = parts.slice(1).join(" ");
     }
   }
-  // întrebările custom se recunosc după cuvinte, nu după subșiruri („tip” nu trebuie să prindă „multiple”)
-  const words = (k: string) => k.split(/[^a-z]+/).filter(Boolean);
-  const custom = (test: (word: string) => boolean) => pick((k) => !STANDARD.has(k) && words(k).some(test));
+  const answers: LeadAnswer[] = list
+    .filter((f) => f.role === "custom" && f.value)
+    .map((f) => ({ key: f.key, question: f.label, answer: f.value as string }));
+  const find = (test: (word: string) => boolean) =>
+    answers.find((a) => words(a.question).some(test) || words(a.key).some(test))?.answer ?? null;
   return {
     firstName: firstName || "Client",
     lastName: lastName || "Facebook",
-    phone: normalizePhone(pick((k) => k === "phone_number" || k.includes("phone") || k.includes("telefon"))),
-    email: pick((k) => k === "email" || k.includes("email") || k.includes("e-mail"))?.toLowerCase() ?? null,
-    furnitureType: custom((w) => /^(tip|tipul|type|mobila|mobilier|furniture)$/.test(w)),
-    budget: custom((w) => /^(buget|bugetul|budget)/.test(w)),
+    phone: normalizePhone(pick("phone")),
+    email: pick("email")?.toLowerCase() ?? null,
+    furnitureType: find((w) => /^(tip|tipul|type)$/.test(w)),
+    budget: find((w) => /^(buget|bugetul|budget)/.test(w)),
+    answers,
   };
 }
 
@@ -93,15 +147,12 @@ export function extractLeadgenChanges(body: unknown): LeadgenChange[] {
   return out;
 }
 
-/** textul care ajunge în comentariul clientului: „📋 Formular Facebook · {reclamă}\nTip: …\nBuget: …” */
-export function leadgenComment(p: { adName?: string | null; furnitureType?: string | null; budget?: string | null }): string {
+/** textul care ajunge în comentariul clientului: „📋 Formular Facebook · {reclamă}” + câte o linie per răspuns */
+export function leadgenComment(p: { adName?: string | null; answers?: LeadAnswer[] | null }): string {
   return [
     `📋 Formular Facebook${p.adName ? ` · ${p.adName}` : ""}`,
-    p.furnitureType ? `Tip: ${p.furnitureType}` : null,
-    p.budget ? `Buget: ${p.budget}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    ...(p.answers ?? []).map((a) => `${a.question.replace(/:\s*$/, "")}: ${a.answer}`),
+  ].join("\n");
 }
 
 // ─────────────────────────── Messenger / Instagram DM ───────────────────────────

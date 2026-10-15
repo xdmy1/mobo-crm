@@ -1,32 +1,33 @@
 // Procesarea evenimentelor Meta (Facebook Lead Ads, Messenger, Instagram DM) primite prin
 // src/app/api/meta/webhook/route.ts. Rulează după ce webhook-ul a răspuns 200 (next/server `after`).
 //
-// - formular instant: luăm lead-ul din Graph API, creăm clientul (Lead, sursa Facebook) cu comentariul
-//   „📋 Formular Facebook · …”; dacă telefonul există deja, clientul nu se dublează — primește o notă;
-// - mesaj: la primul mesaj al unei persoane creăm clientul (telefon gol, sursa Facebook/Instagram) cu
-//   „💬 Messenger · ad …”; mesajele următoare se adaugă doar în istoric (MetaMessage).
+// Lead-urile NU devin clienți automat: stau în secțiunea „Meta Ads” (MetaLead, cu nume / telefon /
+// email / răspunsuri / mesaje) până când cineva apasă „Creează client” (src/server/actions/meta.ts).
+// - formular instant: luăm lead-ul din Graph API (+ întrebările formularului, ca răspunsurile să poarte
+//   textul întrebării) și îl salvăm;
+// - mesaj: la primul mesaj al unei persoane creăm lead-ul (nume din profil), mesajele următoare se
+//   adaugă în istoric (MetaMessage).
 // Deduplicare: MetaLead.metaId (leadgen_id sau PSID/IGSID) și MetaMessage.mid sunt unice.
 
 import { Prisma, type MetaLead, type MetaPlatform } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
 import { personName } from "@/lib/people";
 import {
   extractLeadgenChanges,
   extractMessagingEvents,
-  leadgenComment,
-  messageComment,
   nameFromProfile,
   parseFieldData,
   platformLabel,
+  type FormQuestion,
   type LeadgenChange,
   type MessagingEvent,
   type MetaPlatformName,
 } from "@/lib/meta/parse";
-import { createLeadContact, findContactByPhone, notifySales } from "@/server/leads";
+import { notifySales } from "@/server/leads";
 
 const GRAPH_BASE = process.env.META_GRAPH_BASE || "https://graph.facebook.com";
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v26.0";
+export const META_ADS_PATH = "/admin/meta";
 
 const log = (...a: unknown[]) => console.log("[meta]", ...a);
 const isUniqueViolation = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
@@ -49,14 +50,6 @@ async function graphGet<T>(path: string, fields: string, params: Record<string, 
   return data;
 }
 
-/** responsabilul implicit al lead-urilor din Meta (CRM_DEFAULT_RESPONSIBLE_ID), doar dacă e un angajat activ */
-async function defaultResponsibleId(): Promise<number | null> {
-  const id = parseInt(process.env.CRM_DEFAULT_RESPONSIBLE_ID ?? "", 10);
-  if (!Number.isInteger(id) || id <= 0) return null;
-  const staff = await prisma.staff.findFirst({ where: { id, active: true }, select: { id: true } });
-  return staff?.id ?? null;
-}
-
 /** intrarea MetaLead e „revendicată” prima — unicitatea pe metaId oprește dublurile la retrimiteri */
 async function claimMetaLead(data: Prisma.MetaLeadUncheckedCreateInput): Promise<{ lead: MetaLead; fresh: boolean }> {
   const existing = await prisma.metaLead.findUnique({ where: { metaId: data.metaId } });
@@ -68,11 +61,6 @@ async function claimMetaLead(data: Prisma.MetaLeadUncheckedCreateInput): Promise
     if (!isUniqueViolation(e)) throw e;
     return { lead: await prisma.metaLead.findUniqueOrThrow({ where: { metaId: data.metaId } }), fresh: false };
   }
-}
-
-async function activeContact(contactId: number | null) {
-  if (!contactId) return null;
-  return prisma.contact.findFirst({ where: { id: contactId, deletedAt: null } });
 }
 
 /** Toate evenimentele dintr-o livrare; o eroare la unul nu le oprește pe celelalte. */
@@ -107,6 +95,23 @@ interface GraphLead {
   field_data?: Array<{ name?: string; values?: string[] }>;
 }
 
+/** întrebările formularului (etichete + tipuri), ținute o zi — ca răspunsurile să poarte textul întrebării */
+const formCache = new Map<string, { at: number; questions: FormQuestion[] }>();
+async function formQuestions(formId: string | null | undefined): Promise<FormQuestion[] | null> {
+  if (!formId) return null;
+  const hit = formCache.get(formId);
+  if (hit && Date.now() - hit.at < 24 * 3600_000) return hit.questions;
+  try {
+    const form = await graphGet<{ questions?: FormQuestion[] }>(formId, "questions");
+    const questions = form.questions ?? [];
+    formCache.set(formId, { at: Date.now(), questions });
+    return questions;
+  } catch (err) {
+    log(`întrebările formularului ${formId} nu au putut fi citite:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function handleLeadgen(change: LeadgenChange): Promise<void> {
   const { lead: row, fresh } = await claimMetaLead({
     metaId: change.leadgenId,
@@ -116,8 +121,8 @@ export async function handleLeadgen(change: LeadgenChange): Promise<void> {
     formId: change.formId,
     raw: toJson(change),
   });
-  if (!fresh && row.contactId) {
-    log(`formular ${change.leadgenId} deja procesat (client #${row.contactId})`);
+  if (!fresh && !row.error) {
+    log(`formular ${change.leadgenId} deja salvat (lead #${row.id})`);
     return;
   }
 
@@ -129,54 +134,28 @@ export async function handleLeadgen(change: LeadgenChange): Promise<void> {
     throw err;
   }
 
-  const parsed = parseFieldData(lead.field_data);
+  const parsed = parseFieldData(lead.field_data, await formQuestions(lead.form_id ?? change.formId));
   const platform: MetaPlatform = lead.platform === "ig" ? "INSTAGRAM" : "FACEBOOK";
-  const comment = leadgenComment({ adName: lead.ad_name, furnitureType: parsed.furnitureType, budget: parsed.budget });
-  const existing = await findContactByPhone(parsed.phone);
-
-  let contactId: number;
-  if (existing) {
-    // același telefon → același client; detaliile formularului ajung ca mesaj în fișă
-    contactId = existing.id;
-    await prisma.note.create({ data: { title: "Formular Facebook (client existent)", body: comment, contactId } });
-    await notifySales(
-      `Clientul ${personName(existing)} (#${existing.humanId}) a completat din nou formularul Facebook${lead.ad_name ? ` „${lead.ad_name}”` : ""}.`,
-      `/admin/contact/${existing.id}`,
-      existing.staffId
-    );
-  } else {
-    const contact = await createLeadContact({
-      firstName: parsed.firstName,
-      lastName: parsed.lastName,
-      phone: parsed.phone,
-      email: parsed.email,
-      sourceNames: [platform === "INSTAGRAM" ? "Instagram" : "Facebook"],
-      staffId: await defaultResponsibleId(),
-      comment,
-      fallbackLastName: "Facebook",
-    });
-    contactId = contact.id;
-    await audit(null, "create", "contact", contact.id, { via: "meta-leadgen", leadgenId: change.leadgenId });
-    await notifySales(
-      `Lead nou din formularul Facebook${lead.ad_name ? ` „${lead.ad_name}”` : ""}: ${personName(contact)}${parsed.phone ? ` (${parsed.phone})` : ""}.`,
-      `/admin/contact/${contact.id}`,
-      contact.staffId
-    );
-  }
-
-  await prisma.metaLead.update({
+  const saved = await prisma.metaLead.update({
     where: { id: row.id },
     data: {
-      contactId,
       platform,
       adId: lead.ad_id ?? change.adId,
       adName: lead.ad_name ?? null,
       formId: lead.form_id ?? change.formId,
-      raw: toJson(lead),
+      firstName: parsed.firstName,
+      lastName: parsed.lastName,
+      phone: parsed.phone,
+      email: parsed.email,
+      raw: toJson({ ...lead, answers: parsed.answers }),
       error: null,
     },
   });
-  log(`formular ${change.leadgenId} → client #${contactId}${existing ? " (existent)" : ""}`);
+  await notifySales(
+    `Lead nou din formularul Facebook${lead.ad_name ? ` „${lead.ad_name}”` : ""}: ${personName(saved)}${parsed.phone ? ` (${parsed.phone})` : ""} — în Meta Ads.`,
+    META_ADS_PATH
+  );
+  log(`formular ${change.leadgenId} → lead #${row.id} (${personName(saved)})`);
 }
 
 // ─────────────────────────── Messenger / Instagram DM ───────────────────────────
@@ -205,14 +184,14 @@ export async function handleMessage(platform: MetaPlatformName, ev: MessagingEve
     adId: ev.adId,
     raw: toJson(ev),
   });
-  const contact = fresh ? null : await activeContact(row.contactId);
-  if (contact) {
+  if (!fresh) {
     // persoană cunoscută: doar istoricul
     await saveMessage(row.id, ev);
+    if (!row.adId && ev.adId) await prisma.metaLead.update({ where: { id: row.id }, data: { adId: ev.adId } });
     return;
   }
 
-  // prima conversație (sau clientul de atunci a fost șters): client nou
+  // prima conversație: lead nou, cu numele din profil
   let profile: Parameters<typeof nameFromProfile>[1] = null;
   try {
     profile = await graphGet(ev.senderId, platform === "instagram" ? "name,username" : "first_name,last_name");
@@ -220,49 +199,32 @@ export async function handleMessage(platform: MetaPlatformName, ev: MessagingEve
     log(`profilul ${ev.senderId} nu a putut fi citit:`, err instanceof Error ? err.message : err);
   }
   const name = nameFromProfile(platform, profile);
-  const comment = messageComment({ platform, adId: ev.adId ?? row.adId, text: ev.text });
-  const created = await createLeadContact({
-    ...name,
-    phone: null,
-    email: null,
-    sourceNames: [platform === "instagram" ? "Instagram" : "Facebook"],
-    staffId: await defaultResponsibleId(),
-    comment,
-    fallbackLastName: platform === "instagram" ? "Instagram" : "Facebook",
-  });
-  await prisma.metaLead.update({
+  const saved = await prisma.metaLead.update({
     where: { id: row.id },
-    data: { contactId: created.id, adId: ev.adId ?? row.adId, raw: toJson({ ...ev, profile }), error: null },
+    data: { firstName: name.firstName, lastName: name.lastName, raw: toJson({ ...ev, profile }), error: null },
   });
   await saveMessage(row.id, ev);
-  await audit(null, "create", "contact", created.id, { via: `meta-${platform}`, senderId: ev.senderId });
   await notifySales(
-    `Lead nou din ${platformLabel(platform)}: ${personName(created)}${ev.text ? ` — „${ev.text.slice(0, 80)}”` : ""}`,
-    `/admin/contact/${created.id}`,
-    created.staffId
+    `Mesaj nou pe ${platformLabel(platform)} de la ${personName(saved)}${ev.text ? `: „${ev.text.slice(0, 80)}”` : ""} — în Meta Ads.`,
+    META_ADS_PATH
   );
-  log(`${platformLabel(platform)} ${ev.senderId} → client #${created.id}`);
+  log(`${platformLabel(platform)} ${ev.senderId} → lead #${row.id} (${personName(saved)})`);
 }
 
-// ─────────────────────────── starea token-ului (pagina Meta Leads) ───────────────────────────
+// ─────────────────────────── starea token-ului (pagina Meta Ads) ───────────────────────────
 
-/** permisiunile de care are nevoie integrarea; lipsa lor se vede în Meta Leads, lângă „Page token” */
-export const REQUIRED_SCOPES = [
-  "pages_messaging",
-  "leads_retrieval",
-  "pages_manage_ads",
-  "pages_manage_metadata",
-  "pages_read_engagement",
-  "pages_show_list",
-  "instagram_basic",
-  "instagram_manage_messages",
-];
+/** permisiunile de care are nevoie integrarea; lipsa lor se vede în Meta Ads, lângă „Page token” */
+export const REQUIRED_SCOPES = ["pages_messaging", "leads_retrieval", "pages_manage_ads", "pages_manage_metadata", "pages_read_engagement", "pages_show_list"];
+/** permisiuni doar pentru Instagram (nume din profil, răspunsuri) — lipsa lor e un avertisment, nu o eroare */
+export const INSTAGRAM_SCOPES = ["instagram_basic", "instagram_manage_messages"];
 
 export interface TokenStatus {
   configured: boolean;
   valid: boolean;
-  /** permisiunile cerute care lipsesc din token */
+  /** permisiunile de bază care lipsesc din token */
   missing: string[];
+  /** permisiunile Instagram care lipsesc */
+  missingInstagram: string[];
   error?: string;
 }
 
@@ -271,15 +233,20 @@ let tokenCache: { at: number; token: string; status: TokenStatus } | null = null
 /** Verifică token-ul la Graph API (debug_token); rezultatul se ține 10 minute. */
 export async function metaTokenStatus(): Promise<TokenStatus> {
   const token = process.env.META_PAGE_TOKEN;
-  if (!token) return { configured: false, valid: false, missing: REQUIRED_SCOPES };
+  if (!token) return { configured: false, valid: false, missing: REQUIRED_SCOPES, missingInstagram: INSTAGRAM_SCOPES };
   if (tokenCache && tokenCache.token === token && Date.now() - tokenCache.at < 10 * 60_000) return tokenCache.status;
   let status: TokenStatus;
   try {
     const data = await graphGet<{ data?: { is_valid?: boolean; scopes?: string[] } }>("debug_token", "", { input_token: token });
     const scopes = new Set(data.data?.scopes ?? []);
-    status = { configured: true, valid: data.data?.is_valid === true, missing: REQUIRED_SCOPES.filter((s) => !scopes.has(s)) };
+    status = {
+      configured: true,
+      valid: data.data?.is_valid === true,
+      missing: REQUIRED_SCOPES.filter((s) => !scopes.has(s)),
+      missingInstagram: INSTAGRAM_SCOPES.filter((s) => !scopes.has(s)),
+    };
   } catch (err) {
-    status = { configured: true, valid: false, missing: REQUIRED_SCOPES, error: err instanceof Error ? err.message : String(err) };
+    status = { configured: true, valid: false, missing: REQUIRED_SCOPES, missingInstagram: INSTAGRAM_SCOPES, error: err instanceof Error ? err.message : String(err) };
   }
   tokenCache = { at: Date.now(), token, status };
   return status;

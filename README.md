@@ -101,9 +101,9 @@ curl -X POST https://crm.exemplu.md/api/public/calculator \
 
 ## Integrare Meta (Facebook Lead Ads, Messenger, Instagram DM)
 
-Webhook-ul `POST /api/meta/webhook` (semnat cu `X-Hub-Signature-256`) creează automat clientul în Bord Vânzări → „Lead”,
-cu sursa Facebook / Instagram și comentariul de origine; conversațiile se văd în secțiunea **Meta Leads** din meniu și
-în blocul „Meta” de pe fișa clientului. Configurarea pas cu pas (aplicație, token, abonări, testare): [docs/meta-webhook.md](docs/meta-webhook.md).
+Webhook-ul `POST /api/meta/webhook` (semnat cu `X-Hub-Signature-256`) aduce lead-urile în secțiunea **Meta Ads** din meniu
+(nume, telefon, răspunsuri, mesaje). Un lead devine client în Bord Vânzări → „Lead” doar la „Creează client”; pe fișa
+clientului apare blocul „Meta”. Configurarea pas cu pas (aplicație, token, abonări, testare): [docs/meta-webhook.md](docs/meta-webhook.md).
 
 ## Reguli de business cheie
 

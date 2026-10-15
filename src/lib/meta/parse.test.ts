@@ -9,7 +9,7 @@ import {
 } from "./parse";
 
 describe("parseFieldData (formular instant)", () => {
-  it("citește formularul MOBO: nume complet, telefon, email, tip mobilă, buget", () => {
+  it("citește formularul din brief: nume complet, telefon, email, tip mobilă, buget", () => {
     const lead = parseFieldData([
       { name: "full_name", values: ["Ion Rusu"] },
       { name: "phone_number", values: ["069 123 456"] },
@@ -17,14 +17,45 @@ describe("parseFieldData (formular instant)", () => {
       { name: "ce_tip_de_mobilă_căutați?", values: ["Bucătărie la comandă"] },
       { name: "ce_buget_aproximativ_aveți?_(eur)", values: ["3000-5000"] },
     ]);
-    expect(lead).toEqual({
-      firstName: "Ion",
-      lastName: "Rusu",
-      phone: "+37369123456",
-      email: "ion.rusu@mail.md",
-      furnitureType: "Bucătărie la comandă",
-      budget: "3000-5000",
-    });
+    expect(lead.firstName).toBe("Ion");
+    expect(lead.lastName).toBe("Rusu");
+    expect(lead.phone).toBe("+37369123456");
+    expect(lead.email).toBe("ion.rusu@mail.md");
+    expect(lead.furnitureType).toBe("Bucătărie la comandă");
+    expect(lead.budget).toBe("3000-5000");
+    // fără definiția formularului, întrebarea e cheia „umanizată”
+    expect(lead.answers).toEqual([
+      { key: "ce_tip_de_mobilă_căutați?", question: "Ce tip de mobilă căutați?", answer: "Bucătărie la comandă" },
+      { key: "ce_buget_aproximativ_aveți?_(eur)", question: "Ce buget aproximativ aveți? (eur)", answer: "3000-5000" },
+    ]);
+  });
+  it("formularul real MOBO (12.10): „prenume”, întrebări condiționate cu etichete din definiția formularului", () => {
+    const questions = [
+      { key: "estimativ_în_ce_perioadă_vreți_să_vă_decideți_să_cumpărați_mobilă_nouă?", type: "CUSTOM", label: "Estimativ în ce perioadă vreți să vă decideți să cumpărați mobilă nouă?" },
+      { key: "conditional_question_1", type: "CUSTOM", label: "Ce tip de mobilă căutați?" },
+      { key: "phone_number", type: "PHONE", label: "Phone number" },
+      { key: "prenume", type: "FIRST_NAME", label: "First name" },
+    ];
+    const lead = parseFieldData(
+      [
+        { name: "estimativ_în_ce_perioadă_vreți_să_vă_decideți_să_cumpărați_mobilă_nouă?", values: ["În 1-3 luni"] },
+        { name: "conditional_question_1", values: ["Bucătărie"] },
+        { name: "conditional_question_2", values: ["3000 - 5000 EUR"] },
+        { name: "phone_number", values: ["+37369000111"] },
+        { name: "prenume", values: ["Ana"] },
+      ],
+      questions
+    );
+    expect(lead.firstName).toBe("Ana");
+    expect(lead.lastName).toBe("Facebook");
+    expect(lead.phone).toBe("+37369000111");
+    // „mobilă nouă” din întrebarea despre perioadă nu e luată drept tipul de mobilă
+    expect(lead.furnitureType).toBe("Bucătărie");
+    expect(lead.answers.map((a) => a.question)).toEqual([
+      "Estimativ în ce perioadă vreți să vă decideți să cumpărați mobilă nouă?",
+      "Ce tip de mobilă căutați?",
+      "Conditional question 2",
+    ]);
   });
   it("preferă first_name/last_name când există și normalizează +373 scris cu spații", () => {
     const lead = parseFieldData([
@@ -38,6 +69,7 @@ describe("parseFieldData (formular instant)", () => {
     expect(lead.phone).toBe("+37378333444");
     expect(lead.email).toBeNull();
     expect(lead.budget).toBeNull();
+    expect(lead.answers).toEqual([]);
   });
   it("nu confundă întrebările custom cu câmpurile standard și pune un nume implicit când lipsește", () => {
     const lead = parseFieldData([
@@ -146,10 +178,16 @@ describe("extractMessagingEvents", () => {
 });
 
 describe("texte pentru comentariul clientului", () => {
-  it("formular", () => {
-    expect(leadgenComment({ adName: "Bucătării toamnă", furnitureType: "Dressing / dulap", budget: "2000" })).toBe(
-      "📋 Formular Facebook · Bucătării toamnă\nTip: Dressing / dulap\nBuget: 2000"
-    );
+  it("formular: câte o linie per răspuns, cu textul întrebării", () => {
+    expect(
+      leadgenComment({
+        adName: "Bucătării toamnă",
+        answers: [
+          { key: "k1", question: "Ce tip de mobilă căutați?", answer: "Dressing / dulap" },
+          { key: "k2", question: "Buget:", answer: "2000" },
+        ],
+      })
+    ).toBe("📋 Formular Facebook · Bucătării toamnă\nCe tip de mobilă căutați?: Dressing / dulap\nBuget: 2000");
     expect(leadgenComment({})).toBe("📋 Formular Facebook");
   });
   it("mesaj", () => {
