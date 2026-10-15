@@ -34,11 +34,12 @@ const toJson = (v: unknown) => JSON.parse(JSON.stringify(v ?? null)) as Prisma.I
 const asPlatform = (p: MetaPlatformName): MetaPlatform => (p === "instagram" ? "INSTAGRAM" : "FACEBOOK");
 
 /** GET pe Graph API cu Page Access Token-ul; URL-ul (cu token) nu se loghează niciodată. */
-async function graphGet<T>(path: string, fields: string): Promise<T> {
+async function graphGet<T>(path: string, fields: string, params: Record<string, string> = {}): Promise<T> {
   const token = process.env.META_PAGE_TOKEN;
   if (!token) throw new Error("META_PAGE_TOKEN lipsește din mediu");
   const url = new URL(`${GRAPH_BASE}/${GRAPH_VERSION}/${path}`);
-  url.searchParams.set("fields", fields);
+  if (fields) url.searchParams.set("fields", fields);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("access_token", token);
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
   const data = (await res.json().catch(() => null)) as (T & { error?: { message?: string; code?: number } }) | null;
@@ -241,4 +242,45 @@ export async function handleMessage(platform: MetaPlatformName, ev: MessagingEve
     created.staffId
   );
   log(`${platformLabel(platform)} ${ev.senderId} → client #${created.id}`);
+}
+
+// ─────────────────────────── starea token-ului (pagina Meta Leads) ───────────────────────────
+
+/** permisiunile de care are nevoie integrarea; lipsa lor se vede în Meta Leads, lângă „Page token” */
+export const REQUIRED_SCOPES = [
+  "pages_messaging",
+  "leads_retrieval",
+  "pages_manage_ads",
+  "pages_manage_metadata",
+  "pages_read_engagement",
+  "pages_show_list",
+  "instagram_basic",
+  "instagram_manage_messages",
+];
+
+export interface TokenStatus {
+  configured: boolean;
+  valid: boolean;
+  /** permisiunile cerute care lipsesc din token */
+  missing: string[];
+  error?: string;
+}
+
+let tokenCache: { at: number; token: string; status: TokenStatus } | null = null;
+
+/** Verifică token-ul la Graph API (debug_token); rezultatul se ține 10 minute. */
+export async function metaTokenStatus(): Promise<TokenStatus> {
+  const token = process.env.META_PAGE_TOKEN;
+  if (!token) return { configured: false, valid: false, missing: REQUIRED_SCOPES };
+  if (tokenCache && tokenCache.token === token && Date.now() - tokenCache.at < 10 * 60_000) return tokenCache.status;
+  let status: TokenStatus;
+  try {
+    const data = await graphGet<{ data?: { is_valid?: boolean; scopes?: string[] } }>("debug_token", "", { input_token: token });
+    const scopes = new Set(data.data?.scopes ?? []);
+    status = { configured: true, valid: data.data?.is_valid === true, missing: REQUIRED_SCOPES.filter((s) => !scopes.has(s)) };
+  } catch (err) {
+    status = { configured: true, valid: false, missing: REQUIRED_SCOPES, error: err instanceof Error ? err.message : String(err) };
+  }
+  tokenCache = { at: Date.now(), token, status };
+  return status;
 }

@@ -12,6 +12,7 @@ import { personName } from "@/lib/people";
 import { parseFieldData, type LeadgenField } from "@/lib/meta/parse";
 import { cn } from "@/lib/cn";
 import { contactStageColor } from "@/lib/status";
+import { metaTokenStatus } from "@/server/meta";
 import { PageHeader, StatCard } from "@/components/layout/PageHeader";
 import { Badge, Empty } from "@/components/ui/Misc";
 import { FacebookLogo, InstagramLogo, MetaTile, PlatformLogo } from "@/components/meta/MetaBrand";
@@ -66,14 +67,23 @@ export default async function MetaLeadsPage({ searchParams }: { searchParams: Pr
   await requireUser();
   const { f } = await searchParams;
   const filter = FILTERS.some((x) => x.key === f) ? (f as string) : "all";
-  const [leads, total, week, byPlatform, byKind] = await loadMetaLeads(filter);
+  const [[leads, total, week, byPlatform, byKind], token] = await Promise.all([loadMetaLeads(filter), metaTokenStatus()]);
   const count = (rows: Array<{ _count: { _all: number } } & Record<string, unknown>>, key: string, value: string) =>
     rows.find((r) => r[key] === value)?._count._all ?? 0;
 
   const config = [
     { label: "Verify token", ok: !!process.env.META_VERIFY_TOKEN },
     { label: "App secret", ok: !!process.env.META_APP_SECRET },
-    { label: "Page token", ok: !!process.env.META_PAGE_TOKEN },
+    {
+      label: !token.configured
+        ? "Page token lipsă"
+        : !token.valid
+          ? `Page token invalid${token.error ? ` (${token.error})` : ""}`
+          : token.missing.length
+            ? `Page token fără: ${token.missing.join(", ")}`
+            : "Page token",
+      ok: token.configured && token.valid && token.missing.length === 0,
+    },
   ];
   const configured = config.every((c) => c.ok);
 
