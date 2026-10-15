@@ -26,7 +26,7 @@ import {
 import { createLeadContact, findContactByPhone, notifySales } from "@/server/leads";
 
 const GRAPH_BASE = process.env.META_GRAPH_BASE || "https://graph.facebook.com";
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v26.0";
 
 const log = (...a: unknown[]) => console.log("[meta]", ...a);
 const isUniqueViolation = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";

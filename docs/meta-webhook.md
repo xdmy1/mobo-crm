@@ -20,7 +20,7 @@ Deduplicare: `MetaLead.metaId` (leadgen_id sau PSID/IGSID) și `MetaMessage.mid`
 | `META_VERIFY_TOKEN` | un șir ales de noi (ex. `openssl rand -hex 24`); se introduce identic la Webhooks → „Verify token” |
 | `META_APP_SECRET` | App Dashboard → App settings → Basic → **App secret** |
 | `META_PAGE_TOKEN` | Page Access Token generat pentru un **system user** (nu expiră) — pașii de mai jos |
-| `META_GRAPH_VERSION` | opțional, implicit `v21.0` |
+| `META_GRAPH_VERSION` | opțional, implicit `v26.0` (versiunea curentă din dashboard) |
 | `CRM_DEFAULT_RESPONSIBLE_ID` | opțional: `Staff.id` al angajatului care devine responsabil pe lead-urile din Meta (Setup → Lista Angajați) |
 
 Fără `META_APP_SECRET` webhook-ul răspunde 503 la POST (nu procesează nimic nesemnat). Fără `META_PAGE_TOKEN`
@@ -40,7 +40,7 @@ formularele rămân neprocesate (apar în Meta Leads cu eroarea), iar mesajele c
    Apoi obiectul **Instagram** → aceeași adresă → câmpul `messages` (+ `messaging_postbacks`, `messaging_referrals`).
 4. **Pagina trebuie abonată la aplicație** (altfel Meta nu trimite nimic):
    ```bash
-   curl -X POST "https://graph.facebook.com/v21.0/{PAGE_ID}/subscribed_apps" \
+   curl -X POST "https://graph.facebook.com/v26.0/{PAGE_ID}/subscribed_apps" \
      -d "subscribed_fields=leadgen,messages,messaging_postbacks,messaging_referrals" \
      -d "access_token=$META_PAGE_TOKEN"
    ```
