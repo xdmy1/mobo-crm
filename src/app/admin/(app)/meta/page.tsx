@@ -4,7 +4,7 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
-import { ExternalLink, FileText, MessageCircle, Phone, Mail, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { ExternalLink, FileText, MessageCircle, Phone, Mail, AlertTriangle } from "lucide-react";
 import type { MetaLeadKind, MetaPlatform } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -13,10 +13,9 @@ import { personName } from "@/lib/people";
 import { parseFieldData, type LeadAnswer, type LeadgenField } from "@/lib/meta/parse";
 import { cn } from "@/lib/cn";
 import { contactStageColor } from "@/lib/status";
-import { metaTokenStatus } from "@/server/meta";
 import { PageHeader, StatCard } from "@/components/layout/PageHeader";
 import { Badge, Empty } from "@/components/ui/Misc";
-import { FacebookLogo, InstagramLogo, MetaTile, PlatformLogo } from "@/components/meta/MetaBrand";
+import { FacebookLogo, MetaTile, PlatformLogo } from "@/components/meta/MetaBrand";
 import { MetaLeadActions } from "./MetaLeadActions";
 
 export const metadata = { title: "Meta Ads — MOBO CRM" };
@@ -28,7 +27,6 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: "all", label: "Toate" },
   { key: "leadgen", label: "Formulare" },
   { key: "messenger", label: "Messenger" },
-  { key: "instagram", label: "Instagram DM" },
   { key: "clienti", label: "Deveniți clienți" },
   { key: "respinse", label: "Respinse" },
 ];
@@ -48,13 +46,11 @@ async function loadMetaLeads(filter: string) {
         ? { ...alive, kind: "LEADGEN" as const }
         : filter === "messenger"
           ? { ...alive, kind: "MESSAGE" as const, platform: "FACEBOOK" as const }
-          : filter === "instagram"
-            ? { ...alive, platform: "INSTAGRAM" as const }
-            : filter === "clienti"
-              ? { ...alive, contactId: { not: null } }
-              : filter === "respinse"
-                ? { archivedAt: { not: null } }
-                : alive;
+          : filter === "clienti"
+            ? { ...alive, contactId: { not: null } }
+            : filter === "respinse"
+              ? { archivedAt: { not: null } }
+              : alive;
 
   const since = new Date(Date.now() - 7 * 86400000);
   return Promise.all([
@@ -71,7 +67,7 @@ async function loadMetaLeads(filter: string) {
     prisma.metaLead.count({ where: { archivedAt: null, contactId: null } }),
     prisma.metaLead.count({ where: { contactId: { not: null } } }),
     prisma.metaLead.count({ where: { createdAt: { gte: since } } }),
-    prisma.metaLead.groupBy({ by: ["platform"], where: { archivedAt: null }, _count: { _all: true } }),
+    prisma.metaLead.groupBy({ by: ["kind"], where: { archivedAt: null }, _count: { _all: true } }),
   ]);
 }
 
@@ -79,19 +75,8 @@ export default async function MetaAdsPage({ searchParams }: { searchParams: Prom
   await requireUser();
   const { f } = await searchParams;
   const filter = FILTERS.some((x) => x.key === f) ? (f as string) : "noi";
-  const [[leads, fresh, converted, week, byPlatform], token] = await Promise.all([loadMetaLeads(filter), metaTokenStatus()]);
-  const platformCount = (p: MetaPlatform) => byPlatform.find((r) => r.platform === p)?._count._all ?? 0;
-
-  const tokenProblem = !token.configured ? "Page token lipsă" : !token.valid ? `Page token invalid${token.error ? ` (${token.error})` : ""}` : token.missing.length ? `Page token fără: ${token.missing.join(", ")}` : null;
-  const config: Array<{ label: string; state: "ok" | "warn" | "bad" }> = [
-    { label: "Verify token", state: process.env.META_VERIFY_TOKEN ? "ok" : "bad" },
-    { label: "App secret", state: process.env.META_APP_SECRET ? "ok" : "bad" },
-    tokenProblem
-      ? { label: tokenProblem, state: "bad" }
-      : token.missingInstagram.length
-        ? { label: "Page token (fără permisiunile Instagram)", state: "warn" }
-        : { label: "Page token", state: "ok" },
-  ];
+  const [leads, fresh, converted, week, byKind] = await loadMetaLeads(filter);
+  const kindCount = (k: MetaLeadKind) => byKind.find((r) => r.kind === k)?._count._all ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -102,7 +87,7 @@ export default async function MetaAdsPage({ searchParams }: { searchParams: Prom
             <span>Meta Ads</span>
           </span>
         }
-        subtitle="Formularele Facebook, Messenger și Instagram DM intră aici. Un lead devine client în Bord Vânzări doar când apăsați „Creează client”."
+        subtitle="Formularele Facebook și mesajele din Messenger intră aici. Un lead devine client în Bord Vânzări doar când apăsați „Creează client”."
         actions={
           <a
             href={INBOX_URL}
@@ -121,10 +106,10 @@ export default async function MetaAdsPage({ searchParams }: { searchParams: Prom
         <StatCard label="Lead-uri noi" value={fresh} sub="așteaptă o decizie" tone="lime" href="/admin/meta?f=noi" />
         <StatCard label="Deveniți clienți" value={converted} sub="în Bord Vânzări" tone="green" href="/admin/meta?f=clienti" />
         <StatCard label="Ultimele 7 zile" value={week} sub="lead-uri intrate" tone="blue" />
-        <StatCard label="Facebook / Instagram" value={`${platformCount("FACEBOOK")} / ${platformCount("INSTAGRAM")}`} sub="pe platforme" tone="amber" />
+        <StatCard label="Formulare / Messenger" value={`${kindCount("LEADGEN")} / ${kindCount("MESSAGE")}`} sub="după proveniență" tone="amber" />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <nav className="inline-flex flex-wrap rounded-lg border border-border bg-card p-0.5 shadow-xs" aria-label="Filtru">
           {FILTERS.map((x) => (
             <Link
@@ -139,15 +124,6 @@ export default async function MetaAdsPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </nav>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-          {config.map((c) => (
-            <span key={c.label} className={cn("inline-flex items-center gap-1", c.state === "bad" && "text-danger", c.state === "warn" && "text-warn")}>
-              {c.state === "ok" ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : c.state === "warn" ? <AlertTriangle className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-              {c.label}
-            </span>
-          ))}
-          {config.some((c) => c.state === "bad") && <span className="text-danger">— vezi docs/meta-webhook.md</span>}
-        </div>
       </div>
 
       {leads.length === 0 ? (
@@ -193,7 +169,7 @@ export default async function MetaAdsPage({ searchParams }: { searchParams: Prom
 
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
                     <span className="inline-flex items-center gap-1">
-                      {lead.platform === "INSTAGRAM" ? <InstagramLogo className="h-3.5 w-3.5" /> : <FacebookLogo className="h-3.5 w-3.5" />}
+                      <FacebookLogo className="h-3.5 w-3.5" />
                       {lead.adName ? `Reclamă: ${lead.adName}` : lead.adId ? `Reclamă ${lead.adId}` : "fără reclamă (organic)"}
                     </span>
                     {lead.phone && (
