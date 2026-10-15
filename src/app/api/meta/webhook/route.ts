@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   const raw = new Uint8Array(await req.arrayBuffer());
   if (!verifyMetaSignature(raw, req.headers.get("x-hub-signature-256"), secret)) {
+    console.warn(`[meta] webhook respins: semnătură invalidă (${raw.length} octeți)`);
     return NextResponse.json({ ok: false, error: "Semnătură invalidă" }, { status: 401 });
   }
   let body: unknown;
@@ -36,6 +37,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: "JSON invalid" }, { status: 400 });
   }
+  // o linie per livrare, ca să se vadă în jurnal dacă Meta trimite ceva (chiar și evenimente ignorate)
+  const b = body as { object?: string; entry?: Array<{ changes?: unknown[]; messaging?: unknown[] }> } | null;
+  const entries = Array.isArray(b?.entry) ? b.entry : [];
+  console.log(
+    `[meta] webhook primit: object=${b?.object ?? "?"} entry=${entries.length} changes=${entries.reduce((n, e) => n + (e.changes?.length ?? 0), 0)} messaging=${entries.reduce((n, e) => n + (e.messaging?.length ?? 0), 0)}`
+  );
 
   after(async () => {
     try {
