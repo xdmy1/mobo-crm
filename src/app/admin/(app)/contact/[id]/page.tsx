@@ -22,7 +22,9 @@ import {
   OfferCreateButton,
 } from "@/components/documents/ContractCreateButton";
 import { PresentationCreateButton } from "@/components/documents/PresentationCreateButton";
+import { parseFieldData, type LeadgenField } from "@/lib/meta/parse";
 import { ContactSidebar } from "./ContactSidebar";
+import { MetaPanel, type MetaLeadView } from "./MetaPanel";
 import {
   ContactPanels,
   type PanelRow,
@@ -71,6 +73,7 @@ export default async function ContactDetailPage({
         orderBy: { enteredAt: "desc" },
         include: { stage: true },
       },
+      metaLeads: { orderBy: { createdAt: "asc" }, include: { messages: { orderBy: { sentAt: "asc" } } } },
     },
   });
   if (!contact) notFound();
@@ -157,6 +160,26 @@ export default async function ContactDetailPage({
     downloadHref: o.filePath ? `/api/files/${encodeURIComponent(o.filePath)}?download=1` : undefined,
   }));
 
+  // de unde a venit din Meta (formular / Messenger / Instagram) și ce a scris
+  const metaLeads: MetaLeadView[] = contact.metaLeads.map((l) => {
+    const raw = l.raw as { field_data?: LeadgenField[] } | null;
+    const form = l.kind === "LEADGEN" && raw?.field_data ? parseFieldData(raw.field_data) : null;
+    return {
+      id: l.id,
+      kind: l.kind,
+      platform: l.platform,
+      adName: l.adName,
+      adId: l.adId,
+      formId: l.formId,
+      createdText: fmtDateTime(l.createdAt),
+      details: [
+        form?.furnitureType ? { label: "Tip", value: form.furnitureType } : null,
+        form?.budget ? { label: "Buget", value: `${form.budget} EUR` } : null,
+      ].filter((d): d is { label: string; value: string } => d != null),
+      messages: l.messages.map((m) => ({ id: m.id, text: m.text, whenText: fmtDateTime(m.sentAt) })),
+    };
+  });
+
   // Timeline unificat [NOU]
   const timeline: TimelineItem[] = [
     ...contact.stageHistory.map((h) => ({
@@ -195,6 +218,20 @@ export default async function ContactDetailPage({
       kind: "proiect",
       text: `Proiect creat: ${o.name}`,
     })),
+    ...contact.metaLeads.map((l) => ({
+      when: l.createdAt.toISOString(),
+      whenText: fmtDateTime(l.createdAt),
+      kind: "Meta",
+      text: l.kind === "LEADGEN" ? `Formular Facebook${l.adName ? ` · ${l.adName}` : ""}` : `Prima conversație pe ${l.platform === "INSTAGRAM" ? "Instagram" : "Messenger"}`,
+    })),
+    ...contact.metaLeads.flatMap((l) =>
+      l.messages.map((m) => ({
+        when: m.sentAt.toISOString(),
+        whenText: fmtDateTime(m.sentAt),
+        kind: "Meta",
+        text: `Mesaj ${l.platform === "INSTAGRAM" ? "Instagram" : "Messenger"}: „${m.text}”`,
+      }))
+    ),
   ].sort((a, b) => b.when.localeCompare(a.when));
 
   const dangerStageIds = new Set(stageRows.filter((s) => s.requireFailureCause).map((s) => s.id));
@@ -262,6 +299,8 @@ export default async function ContactDetailPage({
             fixedContactId={contact.id}
           />
         </div>
+
+        <MetaPanel leads={metaLeads} />
 
         <ContactPanels
           contactId={contact.id}

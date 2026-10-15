@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ComponentType,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -65,6 +66,7 @@ import { Modal } from "@/components/ui/Overlay";
 import { FinanceUnlockForm } from "@/components/finance/FinanceUnlockForm";
 import { FINANCE_UNLOCK_MINUTES, type FinanceShellState } from "@/lib/financeShared";
 import { Avatar } from "@/components/ui/Misc";
+import { MetaNavIcon } from "@/components/meta/MetaBrand";
 import { useToast } from "@/components/ui/Toast";
 import { TooltipLayer } from "@/components/ui/Tooltip";
 import { MessageAlert } from "@/components/layout/MessageAlert";
@@ -75,7 +77,8 @@ import { CrumbProvider, useCrumbLeaf } from "./Crumb";
 interface NavLink {
   label: string;
   href: string;
-  icon: LucideIcon;
+  /** icoană lucide sau o siglă proprie (Meta) cu aceeași semnătură */
+  icon: LucideIcon | ComponentType<{ className?: string; strokeWidth?: number }>;
 }
 interface NavGroup {
   label?: string;
@@ -116,6 +119,7 @@ const NAV: NavGroup[] = [
     label: "Bord Clienți",
     items: [
       { label: "Persoane Fizice", href: "/admin/contact", icon: Users },
+      { label: "Meta Leads", href: "/admin/meta", icon: MetaNavIcon },
       { label: "Persoane Juridice", href: "/admin/company", icon: Building2 },
       { label: "Proiecte", href: "/admin/opportunity", icon: FolderKanban },
       { label: "Contracte", href: "/admin/contracts", icon: FileSignature },

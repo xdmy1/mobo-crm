@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { notify } from "@/lib/notify";
 import { personName } from "@/lib/people";
 import { normalizePhone } from "@/lib/phone";
+import { createLeadContact, notifySales } from "@/server/leads";
 
 // rate limiting simplu per IP (anti-spam)
 const hits = new Map<string, { count: number; reset: number }>();
@@ -82,16 +82,6 @@ async function saveRequestNote(contactId: number, opportunityId: number, input: 
   });
 }
 
-async function notifySales(text: string, link: string, alsoStaffId?: number | null) {
-  const managers = await prisma.staff.findMany({
-    where: { active: true, role: { name: { in: ["admin", "Administrator", "Manager Vânzări"] } } },
-    select: { id: true },
-  });
-  const targets = new Set(managers.map((m) => m.id));
-  if (alsoStaffId) targets.add(alsoStaffId);
-  for (const id of targets) await notify(id, text, link);
-}
-
 /** Creează Client (Lead, sursa „Site”) + Cameră Default + Proiect + Estimare goală.
  *  Deduplicare după telefon: dacă există, returnează clientul existent. */
 export async function createLeadPipeline(
@@ -139,23 +129,15 @@ export async function createLeadPipeline(
     }
   }
 
-  const [stage, source, roomType] = await Promise.all([
-    prisma.contactStage.findFirst({ where: { name: "Lead" } }),
-    // „Site Web” = numele vechi, dinainte de lista nouă de surse (06.10.2026)
-    prisma.contactSource.findFirst({ where: { name: { in: ["Site", "Site Web"] } }, orderBy: { order: "asc" } }),
-    roomTypeFor(input.room),
-  ]);
-
-  const contact = await prisma.contact.create({
-    data: {
-      firstName: input.firstName?.trim() || "Client",
-      lastName: input.lastName?.trim() || "Site",
-      phone: phone || null,
-      email: input.email?.trim() || null,
-      stageId: stage?.id,
-      sourceId: source?.id,
-      stageHistory: stage ? { create: { stageId: stage.id } } : undefined,
-    },
+  const roomType = await roomTypeFor(input.room);
+  // etapa „Lead” + sursa „Site” („Site Web” = numele vechi, dinainte de lista nouă de surse din 06.10.2026)
+  const contact = await createLeadContact({
+    firstName: input.firstName,
+    lastName: input.lastName,
+    phone,
+    email: input.email,
+    sourceNames: ["Site", "Site Web"],
+    fallbackLastName: "Site",
   });
 
   const room = await prisma.room.create({

@@ -208,6 +208,7 @@ model Contact {
   tasks         Task[]
   emails        Email[]
   stageHistory  ContactStageHistory[]
+  metaLeads     MetaLead[]
 }
 
 model ContactStageHistory {
@@ -864,4 +865,48 @@ model AuditLog {
   entityId  String?
   meta      Json?
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────── Meta (Facebook Lead Ads / Messenger / Instagram DM) ───────────────────────────
+// Lead-urile intrate prin webhook-ul Meta (src/app/api/meta/webhook). Vezi docs/meta-webhook.md.
+
+enum MetaLeadKind {
+  LEADGEN // formular instant (Lead Ads)
+  MESSAGE // conversație Messenger / Instagram DM
+}
+
+enum MetaPlatform {
+  FACEBOOK
+  INSTAGRAM
+}
+
+model MetaLead {
+  id        Int           @id @default(autoincrement())
+  /// leadgen_id (formular) sau PSID / IGSID (mesaje) — unic: Meta retrimite evenimentele, clientul nu se dublează
+  metaId    String        @unique
+  kind      MetaLeadKind
+  platform  MetaPlatform
+  adId      String?
+  adName    String?
+  formId    String?
+  contactId Int?
+  contact   Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  /// răspunsul Graph API (formular) sau primul eveniment de mesagerie, așa cum a venit
+  raw       Json
+  /// de ce nu s-a putut crea clientul (ex. Graph API indisponibil); null = procesat
+  error     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  MetaMessage[]
+}
+
+model MetaMessage {
+  id         Int      @id @default(autoincrement())
+  metaLeadId Int
+  metaLead   MetaLead @relation(fields: [metaLeadId], references: [id], onDelete: Cascade)
+  /// message.mid de la Meta — unic, ca retrimiterile să nu dubleze mesajul (null la postback-uri)
+  mid        String?  @unique
+  text       String
+  sentAt     DateTime @default(now())
+  createdAt  DateTime @default(now())
 }

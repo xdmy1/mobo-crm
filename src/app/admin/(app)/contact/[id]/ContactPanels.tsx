@@ -107,6 +107,7 @@ const TIMELINE_COLORS: Record<string, BadgeColor> = {
   ofertă: "lime",
   atașament: "gray",
   proiect: "blue",
+  Meta: "lime",
 };
 
 export function SimpleTable({

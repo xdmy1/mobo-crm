@@ -35,6 +35,8 @@ Autentificare implicită: **admin / admin123** (schimb-o imediat din Setup → L
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | aceeași cheie publică, expusă clientului |
 | `UPLOADS_DIR` | directorul de fișiere (implicit `./uploads`) — include-l în backup |
 | `NEXT_PUBLIC_APP_URL` | URL-ul public al aplicației |
+| `META_VERIFY_TOKEN` / `META_APP_SECRET` / `META_PAGE_TOKEN` | integrarea Meta (Lead Ads, Messenger, Instagram DM) — vezi [docs/meta-webhook.md](docs/meta-webhook.md) |
+| `CRM_DEFAULT_RESPONSIBLE_ID` | opțional: `Staff.id` al responsabilului implicit pentru lead-urile din Meta |
 
 ## Deploy pe VPS
 
@@ -96,6 +98,12 @@ curl -X POST https://crm.exemplu.md/api/public/calculator \
                  "bodyBrand":"PAL_EGGER","bodyFinish":"COLOR","facade":"MDF_1P",
                  "worktop":{"material":"PAL_EGGER","sqm":3}}}'
 ```
+
+## Integrare Meta (Facebook Lead Ads, Messenger, Instagram DM)
+
+Webhook-ul `POST /api/meta/webhook` (semnat cu `X-Hub-Signature-256`) creează automat clientul în Bord Vânzări → „Lead”,
+cu sursa Facebook / Instagram și comentariul de origine; conversațiile se văd în secțiunea **Meta Leads** din meniu și
+în blocul „Meta” de pe fișa clientului. Configurarea pas cu pas (aplicație, token, abonări, testare): [docs/meta-webhook.md](docs/meta-webhook.md).
 
 ## Reguli de business cheie
 
